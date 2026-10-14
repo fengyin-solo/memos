@@ -1,5 +1,9 @@
+import { fromBinary } from "@bufbuild/protobuf";
 import { BinaryReader } from "@bufbuild/protobuf/wire";
 import { type Code, ConnectError } from "@connectrpc/connect";
+import { AttachmentQuotaDetailsSchema } from "@/types/proto/api/v1/attachment_service_pb";
+import type { AttachmentQuotaDetails } from "@/types/proto/api/v1/attachment_service_pb";
+import { formatFileSize } from "@/utils/format";
 
 /** google.rpc.ErrorInfo, the mandatory detail on every server error (AIP-193). */
 export interface ErrorInfo {
@@ -10,8 +14,10 @@ export interface ErrorInfo {
 
 export const ERROR_REASON_RATE_LIMITED = "RATE_LIMITED";
 export const ERROR_REASON_CHALLENGE_REQUIRED = "CHALLENGE_REQUIRED";
+export const ERROR_REASON_ATTACHMENT_QUOTA_EXCEEDED = "ATTACHMENT_QUOTA_EXCEEDED";
 
 const ERROR_INFO_TYPE = "google.rpc.ErrorInfo";
+const ATTACHMENT_QUOTA_DETAILS_TYPE = "memos.api.v1.AttachmentQuotaDetails";
 
 // The api protos never reference google.rpc, so its TypeScript schema is not
 // generated; ErrorInfo is three fields, decoded here by hand.
@@ -68,6 +74,32 @@ export function hasErrorReason(error: unknown, reason: string): boolean {
   return getErrorInfo(error)?.reason === reason;
 }
 
+/** Returns the per-user attachment quota detail on a quota refusal, if any. */
+export function getAttachmentQuotaErrorDetails(error: unknown): AttachmentQuotaDetails | undefined {
+  if (!(error instanceof ConnectError)) {
+    return undefined;
+  }
+  for (const detail of error.details) {
+    if ("type" in detail && detail.type === ATTACHMENT_QUOTA_DETAILS_TYPE && "value" in detail && detail.value instanceof Uint8Array) {
+      try {
+        return fromBinary(AttachmentQuotaDetailsSchema, detail.value);
+      } catch {
+        return undefined;
+      }
+    }
+  }
+  return undefined;
+}
+
+function formatAttachmentQuotaMessage(details: AttachmentQuotaDetails): string {
+  const used = formatFileSize(Number(details.usedBytes));
+  const requested = formatFileSize(Number(details.requestedBytes));
+  if (details.remainingBytes >= 0) {
+    return `Storage quota exceeded: ${used} used, only ${formatFileSize(Number(details.remainingBytes))} available, this file needs ${requested}.`;
+  }
+  return `Storage quota exceeded: ${used} used, this file needs ${requested}.`;
+}
+
 /** Seconds to wait before retrying a rate-limited request, or undefined. */
 export function getRetryAfterSeconds(error: unknown): number | undefined {
   const info = getErrorInfo(error);
@@ -96,6 +128,10 @@ export function getErrorMessage(error: unknown, fallback = "Unknown error"): str
     }
     if (hasErrorReason(error, ERROR_REASON_CHALLENGE_REQUIRED)) {
       return "Complete the verification challenge and try again.";
+    }
+    const quotaDetails = getAttachmentQuotaErrorDetails(error);
+    if (quotaDetails) {
+      return formatAttachmentQuotaMessage(quotaDetails);
     }
     return error.rawMessage || fallback;
   }

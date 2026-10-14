@@ -55,6 +55,15 @@ const (
 	// AttachmentServiceBatchDeleteAttachmentsProcedure is the fully-qualified name of the
 	// AttachmentService's BatchDeleteAttachments RPC.
 	AttachmentServiceBatchDeleteAttachmentsProcedure = "/memos.api.v1.AttachmentService/BatchDeleteAttachments"
+	// AttachmentServiceGetAttachmentQuotaProcedure is the fully-qualified name of the
+	// AttachmentService's GetAttachmentQuota RPC.
+	AttachmentServiceGetAttachmentQuotaProcedure = "/memos.api.v1.AttachmentService/GetAttachmentQuota"
+	// AttachmentServiceListAttachmentQuotasProcedure is the fully-qualified name of the
+	// AttachmentService's ListAttachmentQuotas RPC.
+	AttachmentServiceListAttachmentQuotasProcedure = "/memos.api.v1.AttachmentService/ListAttachmentQuotas"
+	// AttachmentServiceUpdateAttachmentQuotaProcedure is the fully-qualified name of the
+	// AttachmentService's UpdateAttachmentQuota RPC.
+	AttachmentServiceUpdateAttachmentQuotaProcedure = "/memos.api.v1.AttachmentService/UpdateAttachmentQuota"
 )
 
 // AttachmentServiceClient is a client for the memos.api.v1.AttachmentService service.
@@ -76,6 +85,15 @@ type AttachmentServiceClient interface {
 	DeleteAttachment(context.Context, *connect.Request[v1.DeleteAttachmentRequest]) (*connect.Response[emptypb.Empty], error)
 	// BatchDeleteAttachments deletes multiple attachments in one request.
 	BatchDeleteAttachments(context.Context, *connect.Request[v1.BatchDeleteAttachmentsRequest]) (*connect.Response[emptypb.Empty], error)
+	// GetAttachmentQuota returns the attachment byte quota state of one user.
+	// Users may read their own quota; instance administrators may read any user.
+	GetAttachmentQuota(context.Context, *connect.Request[v1.GetAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error)
+	// ListAttachmentQuotas returns the attachment quota states of all users.
+	// Instance administrators only.
+	ListAttachmentQuotas(context.Context, *connect.Request[v1.ListAttachmentQuotasRequest]) (*connect.Response[v1.ListAttachmentQuotasResponse], error)
+	// UpdateAttachmentQuota sets or clears the per-user attachment quota
+	// override. Instance administrators only.
+	UpdateAttachmentQuota(context.Context, *connect.Request[v1.UpdateAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error)
 }
 
 // NewAttachmentServiceClient constructs a client for the memos.api.v1.AttachmentService service. By
@@ -131,6 +149,24 @@ func NewAttachmentServiceClient(httpClient connect.HTTPClient, baseURL string, o
 			connect.WithSchema(attachmentServiceMethods.ByName("BatchDeleteAttachments")),
 			connect.WithClientOptions(opts...),
 		),
+		getAttachmentQuota: connect.NewClient[v1.GetAttachmentQuotaRequest, v1.AttachmentQuota](
+			httpClient,
+			baseURL+AttachmentServiceGetAttachmentQuotaProcedure,
+			connect.WithSchema(attachmentServiceMethods.ByName("GetAttachmentQuota")),
+			connect.WithClientOptions(opts...),
+		),
+		listAttachmentQuotas: connect.NewClient[v1.ListAttachmentQuotasRequest, v1.ListAttachmentQuotasResponse](
+			httpClient,
+			baseURL+AttachmentServiceListAttachmentQuotasProcedure,
+			connect.WithSchema(attachmentServiceMethods.ByName("ListAttachmentQuotas")),
+			connect.WithClientOptions(opts...),
+		),
+		updateAttachmentQuota: connect.NewClient[v1.UpdateAttachmentQuotaRequest, v1.AttachmentQuota](
+			httpClient,
+			baseURL+AttachmentServiceUpdateAttachmentQuotaProcedure,
+			connect.WithSchema(attachmentServiceMethods.ByName("UpdateAttachmentQuota")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -143,6 +179,9 @@ type attachmentServiceClient struct {
 	updateAttachment       *connect.Client[v1.UpdateAttachmentRequest, v1.Attachment]
 	deleteAttachment       *connect.Client[v1.DeleteAttachmentRequest, emptypb.Empty]
 	batchDeleteAttachments *connect.Client[v1.BatchDeleteAttachmentsRequest, emptypb.Empty]
+	getAttachmentQuota     *connect.Client[v1.GetAttachmentQuotaRequest, v1.AttachmentQuota]
+	listAttachmentQuotas   *connect.Client[v1.ListAttachmentQuotasRequest, v1.ListAttachmentQuotasResponse]
+	updateAttachmentQuota  *connect.Client[v1.UpdateAttachmentQuotaRequest, v1.AttachmentQuota]
 }
 
 // CreateAttachment calls memos.api.v1.AttachmentService.CreateAttachment.
@@ -180,6 +219,21 @@ func (c *attachmentServiceClient) BatchDeleteAttachments(ctx context.Context, re
 	return c.batchDeleteAttachments.CallUnary(ctx, req)
 }
 
+// GetAttachmentQuota calls memos.api.v1.AttachmentService.GetAttachmentQuota.
+func (c *attachmentServiceClient) GetAttachmentQuota(ctx context.Context, req *connect.Request[v1.GetAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error) {
+	return c.getAttachmentQuota.CallUnary(ctx, req)
+}
+
+// ListAttachmentQuotas calls memos.api.v1.AttachmentService.ListAttachmentQuotas.
+func (c *attachmentServiceClient) ListAttachmentQuotas(ctx context.Context, req *connect.Request[v1.ListAttachmentQuotasRequest]) (*connect.Response[v1.ListAttachmentQuotasResponse], error) {
+	return c.listAttachmentQuotas.CallUnary(ctx, req)
+}
+
+// UpdateAttachmentQuota calls memos.api.v1.AttachmentService.UpdateAttachmentQuota.
+func (c *attachmentServiceClient) UpdateAttachmentQuota(ctx context.Context, req *connect.Request[v1.UpdateAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error) {
+	return c.updateAttachmentQuota.CallUnary(ctx, req)
+}
+
 // AttachmentServiceHandler is an implementation of the memos.api.v1.AttachmentService service.
 type AttachmentServiceHandler interface {
 	// CreateAttachment creates a new attachment.
@@ -199,6 +253,15 @@ type AttachmentServiceHandler interface {
 	DeleteAttachment(context.Context, *connect.Request[v1.DeleteAttachmentRequest]) (*connect.Response[emptypb.Empty], error)
 	// BatchDeleteAttachments deletes multiple attachments in one request.
 	BatchDeleteAttachments(context.Context, *connect.Request[v1.BatchDeleteAttachmentsRequest]) (*connect.Response[emptypb.Empty], error)
+	// GetAttachmentQuota returns the attachment byte quota state of one user.
+	// Users may read their own quota; instance administrators may read any user.
+	GetAttachmentQuota(context.Context, *connect.Request[v1.GetAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error)
+	// ListAttachmentQuotas returns the attachment quota states of all users.
+	// Instance administrators only.
+	ListAttachmentQuotas(context.Context, *connect.Request[v1.ListAttachmentQuotasRequest]) (*connect.Response[v1.ListAttachmentQuotasResponse], error)
+	// UpdateAttachmentQuota sets or clears the per-user attachment quota
+	// override. Instance administrators only.
+	UpdateAttachmentQuota(context.Context, *connect.Request[v1.UpdateAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error)
 }
 
 // NewAttachmentServiceHandler builds an HTTP handler from the service implementation. It returns
@@ -250,6 +313,24 @@ func NewAttachmentServiceHandler(svc AttachmentServiceHandler, opts ...connect.H
 		connect.WithSchema(attachmentServiceMethods.ByName("BatchDeleteAttachments")),
 		connect.WithHandlerOptions(opts...),
 	)
+	attachmentServiceGetAttachmentQuotaHandler := connect.NewUnaryHandler(
+		AttachmentServiceGetAttachmentQuotaProcedure,
+		svc.GetAttachmentQuota,
+		connect.WithSchema(attachmentServiceMethods.ByName("GetAttachmentQuota")),
+		connect.WithHandlerOptions(opts...),
+	)
+	attachmentServiceListAttachmentQuotasHandler := connect.NewUnaryHandler(
+		AttachmentServiceListAttachmentQuotasProcedure,
+		svc.ListAttachmentQuotas,
+		connect.WithSchema(attachmentServiceMethods.ByName("ListAttachmentQuotas")),
+		connect.WithHandlerOptions(opts...),
+	)
+	attachmentServiceUpdateAttachmentQuotaHandler := connect.NewUnaryHandler(
+		AttachmentServiceUpdateAttachmentQuotaProcedure,
+		svc.UpdateAttachmentQuota,
+		connect.WithSchema(attachmentServiceMethods.ByName("UpdateAttachmentQuota")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.AttachmentService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case AttachmentServiceCreateAttachmentProcedure:
@@ -266,6 +347,12 @@ func NewAttachmentServiceHandler(svc AttachmentServiceHandler, opts ...connect.H
 			attachmentServiceDeleteAttachmentHandler.ServeHTTP(w, r)
 		case AttachmentServiceBatchDeleteAttachmentsProcedure:
 			attachmentServiceBatchDeleteAttachmentsHandler.ServeHTTP(w, r)
+		case AttachmentServiceGetAttachmentQuotaProcedure:
+			attachmentServiceGetAttachmentQuotaHandler.ServeHTTP(w, r)
+		case AttachmentServiceListAttachmentQuotasProcedure:
+			attachmentServiceListAttachmentQuotasHandler.ServeHTTP(w, r)
+		case AttachmentServiceUpdateAttachmentQuotaProcedure:
+			attachmentServiceUpdateAttachmentQuotaHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -301,4 +388,16 @@ func (UnimplementedAttachmentServiceHandler) DeleteAttachment(context.Context, *
 
 func (UnimplementedAttachmentServiceHandler) BatchDeleteAttachments(context.Context, *connect.Request[v1.BatchDeleteAttachmentsRequest]) (*connect.Response[emptypb.Empty], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AttachmentService.BatchDeleteAttachments is not implemented"))
+}
+
+func (UnimplementedAttachmentServiceHandler) GetAttachmentQuota(context.Context, *connect.Request[v1.GetAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AttachmentService.GetAttachmentQuota is not implemented"))
+}
+
+func (UnimplementedAttachmentServiceHandler) ListAttachmentQuotas(context.Context, *connect.Request[v1.ListAttachmentQuotasRequest]) (*connect.Response[v1.ListAttachmentQuotasResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AttachmentService.ListAttachmentQuotas is not implemented"))
+}
+
+func (UnimplementedAttachmentServiceHandler) UpdateAttachmentQuota(context.Context, *connect.Request[v1.UpdateAttachmentQuotaRequest]) (*connect.Response[v1.AttachmentQuota], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.AttachmentService.UpdateAttachmentQuota is not implemented"))
 }

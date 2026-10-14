@@ -713,6 +713,30 @@ func (s *ConnectServiceHandler) BatchDeleteAttachments(ctx context.Context, req 
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) GetAttachmentQuota(ctx context.Context, req *connect.Request[v1pb.GetAttachmentQuotaRequest]) (*connect.Response[v1pb.AttachmentQuota], error) {
+	resp, err := s.APIV1Service.GetAttachmentQuota(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) ListAttachmentQuotas(ctx context.Context, req *connect.Request[v1pb.ListAttachmentQuotasRequest]) (*connect.Response[v1pb.ListAttachmentQuotasResponse], error) {
+	resp, err := s.APIV1Service.ListAttachmentQuotas(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
+func (s *ConnectServiceHandler) UpdateAttachmentQuota(ctx context.Context, req *connect.Request[v1pb.UpdateAttachmentQuotaRequest]) (*connect.Response[v1pb.AttachmentQuota], error) {
+	resp, err := s.APIV1Service.UpdateAttachmentQuota(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // AIService
 
 func (s *ConnectServiceHandler) Transcribe(ctx context.Context, req *connect.Request[v1pb.TranscribeRequest]) (*connect.Response[v1pb.TranscribeResponse], error) {

@@ -27,6 +27,9 @@ const (
 	AttachmentService_UpdateAttachment_FullMethodName       = "/memos.api.v1.AttachmentService/UpdateAttachment"
 	AttachmentService_DeleteAttachment_FullMethodName       = "/memos.api.v1.AttachmentService/DeleteAttachment"
 	AttachmentService_BatchDeleteAttachments_FullMethodName = "/memos.api.v1.AttachmentService/BatchDeleteAttachments"
+	AttachmentService_GetAttachmentQuota_FullMethodName     = "/memos.api.v1.AttachmentService/GetAttachmentQuota"
+	AttachmentService_ListAttachmentQuotas_FullMethodName   = "/memos.api.v1.AttachmentService/ListAttachmentQuotas"
+	AttachmentService_UpdateAttachmentQuota_FullMethodName  = "/memos.api.v1.AttachmentService/UpdateAttachmentQuota"
 )
 
 // AttachmentServiceClient is the client API for AttachmentService service.
@@ -50,6 +53,15 @@ type AttachmentServiceClient interface {
 	DeleteAttachment(ctx context.Context, in *DeleteAttachmentRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// BatchDeleteAttachments deletes multiple attachments in one request.
 	BatchDeleteAttachments(ctx context.Context, in *BatchDeleteAttachmentsRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	// GetAttachmentQuota returns the attachment byte quota state of one user.
+	// Users may read their own quota; instance administrators may read any user.
+	GetAttachmentQuota(ctx context.Context, in *GetAttachmentQuotaRequest, opts ...grpc.CallOption) (*AttachmentQuota, error)
+	// ListAttachmentQuotas returns the attachment quota states of all users.
+	// Instance administrators only.
+	ListAttachmentQuotas(ctx context.Context, in *ListAttachmentQuotasRequest, opts ...grpc.CallOption) (*ListAttachmentQuotasResponse, error)
+	// UpdateAttachmentQuota sets or clears the per-user attachment quota
+	// override. Instance administrators only.
+	UpdateAttachmentQuota(ctx context.Context, in *UpdateAttachmentQuotaRequest, opts ...grpc.CallOption) (*AttachmentQuota, error)
 }
 
 type attachmentServiceClient struct {
@@ -130,6 +142,36 @@ func (c *attachmentServiceClient) BatchDeleteAttachments(ctx context.Context, in
 	return out, nil
 }
 
+func (c *attachmentServiceClient) GetAttachmentQuota(ctx context.Context, in *GetAttachmentQuotaRequest, opts ...grpc.CallOption) (*AttachmentQuota, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AttachmentQuota)
+	err := c.cc.Invoke(ctx, AttachmentService_GetAttachmentQuota_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *attachmentServiceClient) ListAttachmentQuotas(ctx context.Context, in *ListAttachmentQuotasRequest, opts ...grpc.CallOption) (*ListAttachmentQuotasResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListAttachmentQuotasResponse)
+	err := c.cc.Invoke(ctx, AttachmentService_ListAttachmentQuotas_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *attachmentServiceClient) UpdateAttachmentQuota(ctx context.Context, in *UpdateAttachmentQuotaRequest, opts ...grpc.CallOption) (*AttachmentQuota, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AttachmentQuota)
+	err := c.cc.Invoke(ctx, AttachmentService_UpdateAttachmentQuota_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // AttachmentServiceServer is the server API for AttachmentService service.
 // All implementations must embed UnimplementedAttachmentServiceServer
 // for forward compatibility.
@@ -151,6 +193,15 @@ type AttachmentServiceServer interface {
 	DeleteAttachment(context.Context, *DeleteAttachmentRequest) (*emptypb.Empty, error)
 	// BatchDeleteAttachments deletes multiple attachments in one request.
 	BatchDeleteAttachments(context.Context, *BatchDeleteAttachmentsRequest) (*emptypb.Empty, error)
+	// GetAttachmentQuota returns the attachment byte quota state of one user.
+	// Users may read their own quota; instance administrators may read any user.
+	GetAttachmentQuota(context.Context, *GetAttachmentQuotaRequest) (*AttachmentQuota, error)
+	// ListAttachmentQuotas returns the attachment quota states of all users.
+	// Instance administrators only.
+	ListAttachmentQuotas(context.Context, *ListAttachmentQuotasRequest) (*ListAttachmentQuotasResponse, error)
+	// UpdateAttachmentQuota sets or clears the per-user attachment quota
+	// override. Instance administrators only.
+	UpdateAttachmentQuota(context.Context, *UpdateAttachmentQuotaRequest) (*AttachmentQuota, error)
 	mustEmbedUnimplementedAttachmentServiceServer()
 }
 
@@ -181,6 +232,15 @@ func (UnimplementedAttachmentServiceServer) DeleteAttachment(context.Context, *D
 }
 func (UnimplementedAttachmentServiceServer) BatchDeleteAttachments(context.Context, *BatchDeleteAttachmentsRequest) (*emptypb.Empty, error) {
 	return nil, status.Error(codes.Unimplemented, "method BatchDeleteAttachments not implemented")
+}
+func (UnimplementedAttachmentServiceServer) GetAttachmentQuota(context.Context, *GetAttachmentQuotaRequest) (*AttachmentQuota, error) {
+	return nil, status.Error(codes.Unimplemented, "method GetAttachmentQuota not implemented")
+}
+func (UnimplementedAttachmentServiceServer) ListAttachmentQuotas(context.Context, *ListAttachmentQuotasRequest) (*ListAttachmentQuotasResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListAttachmentQuotas not implemented")
+}
+func (UnimplementedAttachmentServiceServer) UpdateAttachmentQuota(context.Context, *UpdateAttachmentQuotaRequest) (*AttachmentQuota, error) {
+	return nil, status.Error(codes.Unimplemented, "method UpdateAttachmentQuota not implemented")
 }
 func (UnimplementedAttachmentServiceServer) mustEmbedUnimplementedAttachmentServiceServer() {}
 func (UnimplementedAttachmentServiceServer) testEmbeddedByValue()                           {}
@@ -329,6 +389,60 @@ func _AttachmentService_BatchDeleteAttachments_Handler(srv interface{}, ctx cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _AttachmentService_GetAttachmentQuota_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(GetAttachmentQuotaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AttachmentServiceServer).GetAttachmentQuota(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AttachmentService_GetAttachmentQuota_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AttachmentServiceServer).GetAttachmentQuota(ctx, req.(*GetAttachmentQuotaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AttachmentService_ListAttachmentQuotas_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListAttachmentQuotasRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AttachmentServiceServer).ListAttachmentQuotas(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AttachmentService_ListAttachmentQuotas_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AttachmentServiceServer).ListAttachmentQuotas(ctx, req.(*ListAttachmentQuotasRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _AttachmentService_UpdateAttachmentQuota_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UpdateAttachmentQuotaRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(AttachmentServiceServer).UpdateAttachmentQuota(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: AttachmentService_UpdateAttachmentQuota_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(AttachmentServiceServer).UpdateAttachmentQuota(ctx, req.(*UpdateAttachmentQuotaRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // AttachmentService_ServiceDesc is the grpc.ServiceDesc for AttachmentService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -363,6 +477,18 @@ var AttachmentService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BatchDeleteAttachments",
 			Handler:    _AttachmentService_BatchDeleteAttachments_Handler,
+		},
+		{
+			MethodName: "GetAttachmentQuota",
+			Handler:    _AttachmentService_GetAttachmentQuota_Handler,
+		},
+		{
+			MethodName: "ListAttachmentQuotas",
+			Handler:    _AttachmentService_ListAttachmentQuotas_Handler,
+		},
+		{
+			MethodName: "UpdateAttachmentQuota",
+			Handler:    _AttachmentService_UpdateAttachmentQuota_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

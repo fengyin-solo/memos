@@ -65,6 +65,9 @@ func (d *DB) CreateUserWithIdentity(ctx context.Context, createUser *store.User,
 		return nil, errors.Wrap(err, "failed to read created user ID")
 	}
 	createUser.ID = int32(rawUserID)
+	if err := ensureMySQLUserAttachmentQuotaRow(ctx, tx, createUser.ID); err != nil {
+		return nil, errors.Wrap(err, "failed to create attachment quota row")
+	}
 	// RETURNING is unavailable on MySQL, so read back the complete stored row
 	// within the same transaction before adding it to the user cache.
 	var email sql.NullString

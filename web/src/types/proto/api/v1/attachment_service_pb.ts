@@ -16,7 +16,7 @@ import type { Message } from "@bufbuild/protobuf";
  * Describes the file api/v1/attachment_service.proto.
  */
 export const file_api_v1_attachment_service: GenFile = /*@__PURE__*/
-  fileDesc("Ch9hcGkvdjEvYXR0YWNobWVudF9zZXJ2aWNlLnByb3RvEgxtZW1vcy5hcGkudjEivAEKC01vdGlvbk1lZGlhEi8KBmZhbWlseRgBIAEoDjIfLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUZhbWlseRIrCgRyb2xlGAIgASgOMh0ubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhUm9sZRIQCghncm91cF9pZBgDIAEoCRIhChlwcmVzZW50YXRpb25fdGltZXN0YW1wX3VzGAQgASgDEhoKEmhhc19lbWJlZGRlZF92aWRlbxgFIAEoCCK0AQoNTWVkaWFNZXRhZGF0YRISCgV3aWR0aBgBIAEoBUgBiAEBEhMKBmhlaWdodBgCIAEoBUgCiAEBEiwKBXBob3RvGAMgASgLMhsubWVtb3MuYXBpLnYxLlBob3RvTWV0YWRhdGFIABIsCgV2aWRlbxgEIAEoCzIbLm1lbW9zLmFwaS52MS5WaWRlb01ldGFkYXRhSABCCQoHZGV0YWlsc0IICgZfd2lkdGhCCQoHX2hlaWdodCKjAwoNUGhvdG9NZXRhZGF0YRI0CgxjYXB0dXJlX3RpbWUYASABKAsyHi5tZW1vcy5hcGkudjEuTWVkaWFDYXB0dXJlVGltZRItCghsb2NhdGlvbhgCIAEoCzIbLm1lbW9zLmFwaS52MS5NZWRpYUxvY2F0aW9uEiQKF3NvdXJjZV9leGlmX29yaWVudGF0aW9uGAMgASgFSACIAQESEwoLY2FtZXJhX21ha2UYBCABKAkSFAoMY2FtZXJhX21vZGVsGAUgASgJEhIKCmxlbnNfbW9kZWwYBiABKAkSFQoIZl9udW1iZXIYByABKAFIAYgBARIiChVleHBvc3VyZV90aW1lX3NlY29uZHMYCCABKAFIAogBARIQCgNpc28YCSABKAVIA4gBARIcCg9mb2NhbF9sZW5ndGhfbW0YCiABKAFIBIgBAUIaChhfc291cmNlX2V4aWZfb3JpZW50YXRpb25CCwoJX2ZfbnVtYmVyQhgKFl9leHBvc3VyZV90aW1lX3NlY29uZHNCBgoEX2lzb0ISChBfZm9jYWxfbGVuZ3RoX21tIlMKEE1lZGlhQ2FwdHVyZVRpbWUSFwoPbG9jYWxfZGF0ZV90aW1lGAEgASgJEhcKCnV0Y19vZmZzZXQYAiABKAlIAIgBAUINCgtfdXRjX29mZnNldCKLAQoNTWVkaWFMb2NhdGlvbhIVCghsYXRpdHVkZRgBIAEoAUgAiAEBEhYKCWxvbmdpdHVkZRgCIAEoAUgBiAEBEhwKD2FsdGl0dWRlX21ldGVycxgDIAEoAUgCiAEBQgsKCV9sYXRpdHVkZUIMCgpfbG9uZ2l0dWRlQhIKEF9hbHRpdHVkZV9tZXRlcnMiQwoNVmlkZW9NZXRhZGF0YRIdChBkdXJhdGlvbl9zZWNvbmRzGAEgASgBSACIAQFCEwoRX2R1cmF0aW9uX3NlY29uZHMiqQMKCkF0dGFjaG1lbnQSEQoEbmFtZRgBIAEoCUID4EEIEjQKC2NyZWF0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhUKCGZpbGVuYW1lGAMgASgJQgPgQQISFAoHY29udGVudBgEIAEoDEID4EEEEhoKDWV4dGVybmFsX2xpbmsYBSABKAlCA+BBARIRCgR0eXBlGAYgASgJQgPgQQISEQoEc2l6ZRgHIAEoA0ID4EEDEhYKBG1lbW8YCCABKAlCA+BBAUgAiAEBEjQKDG1vdGlvbl9tZWRpYRgJIAEoCzIZLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUID4EEBEjsKDm1lZGlhX21ldGFkYXRhGAogASgLMhsubWVtb3MuYXBpLnYxLk1lZGlhTWV0YWRhdGFCBuBBAeBBBTpP6kFMChdtZW1vcy5hcGkudjEvQXR0YWNobWVudBIYYXR0YWNobWVudHMve2F0dGFjaG1lbnR9KgthdHRhY2htZW50czIKYXR0YWNobWVudEIHCgVfbWVtbyJoChdDcmVhdGVBdHRhY2htZW50UmVxdWVzdBIxCgphdHRhY2htZW50GAEgASgLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRCA+BBAhIaCg1hdHRhY2htZW50X2lkGAIgASgJQgPgQQEitQEKF1VwbG9hZEF0dGFjaG1lbnRSZXF1ZXN0EjIKBHNwZWMYASABKAsyIi5tZW1vcy5hcGkudjEuVXBsb2FkQXR0YWNobWVudFNwZWNIABITCgl1cGxvYWRfaWQYAiABKAlIABIZCgx3cml0ZV9vZmZzZXQYAyABKANCA+BBAhIRCgRkYXRhGAQgASgMQgPgQQESGQoMZmluaXNoX3dyaXRlGAUgASgIQgPgQQFCCAoGdXBsb2FkIn4KFFVwbG9hZEF0dGFjaG1lbnRTcGVjEjEKCmF0dGFjaG1lbnQYASABKAsyGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudEID4EECEhoKDWF0dGFjaG1lbnRfaWQYAiABKAlCA+BBARIXCgp0b3RhbF9zaXplGAMgASgDQgPgQQEiiwEKGFVwbG9hZEF0dGFjaG1lbnRSZXNwb25zZRIRCgl1cGxvYWRfaWQYASABKAkSFgoOY29tbWl0dGVkX3NpemUYAiABKAMSLAoKYXR0YWNobWVudBgDIAEoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50EhYKDm1heF9jaHVua19zaXplGAQgASgFIpQBChZMaXN0QXR0YWNobWVudHNSZXF1ZXN0EhYKCXBhZ2Vfc2l6ZRgBIAEoBUID4EEBEhcKCnBhZ2VfdG9rZW4YAiABKAlCA+BBARITCgZmaWx0ZXIYAyABKAlCA+BBARIVCghvcmRlcl9ieRgEIAEoCUID4EEBSgQIBRAGSgQIBhAHUgVzcGFjZVIKdW5hc3NpZ25lZCJhChdMaXN0QXR0YWNobWVudHNSZXNwb25zZRItCgthdHRhY2htZW50cxgBIAMoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJFChRHZXRBdHRhY2htZW50UmVxdWVzdBItCgRuYW1lGAEgASgJQh/gQQL6QRkKF21lbW9zLmFwaS52MS9BdHRhY2htZW50IoIBChdVcGRhdGVBdHRhY2htZW50UmVxdWVzdBIxCgphdHRhY2htZW50GAEgASgLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRCA+BBAhI0Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCA+BBAiJIChdEZWxldGVBdHRhY2htZW50UmVxdWVzdBItCgRuYW1lGAEgASgJQh/gQQL6QRkKF21lbW9zLmFwaS52MS9BdHRhY2htZW50IjMKHUJhdGNoRGVsZXRlQXR0YWNobWVudHNSZXF1ZXN0EhIKBW5hbWVzGAEgAygJQgPgQQIqaAoRTW90aW9uTWVkaWFGYW1pbHkSIwofTU9USU9OX01FRElBX0ZBTUlMWV9VTlNQRUNJRklFRBAAEhQKEEFQUExFX0xJVkVfUEhPVE8QARIYChRBTkRST0lEX01PVElPTl9QSE9UTxACKlkKD01vdGlvbk1lZGlhUm9sZRIhCh1NT1RJT05fTUVESUFfUk9MRV9VTlNQRUNJRklFRBAAEgkKBVNUSUxMEAESCQoFVklERU8QAhINCglDT05UQUlORVIQAzLbBwoRQXR0YWNobWVudFNlcnZpY2USiQEKEENyZWF0ZUF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuQ3JlYXRlQXR0YWNobWVudFJlcXVlc3QaGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudCI02kEKYXR0YWNobWVudILT5JMCIToKYXR0YWNobWVudCITL2FwaS92MS9hdHRhY2htZW50cxKIAQoQVXBsb2FkQXR0YWNobWVudBIlLm1lbW9zLmFwaS52MS5VcGxvYWRBdHRhY2htZW50UmVxdWVzdBomLm1lbW9zLmFwaS52MS5VcGxvYWRBdHRhY2htZW50UmVzcG9uc2UiJYLT5JMCHzoBKiIaL2FwaS92MS9hdHRhY2htZW50czp1cGxvYWQSewoPTGlzdEF0dGFjaG1lbnRzEiQubWVtb3MuYXBpLnYxLkxpc3RBdHRhY2htZW50c1JlcXVlc3QaJS5tZW1vcy5hcGkudjEuTGlzdEF0dGFjaG1lbnRzUmVzcG9uc2UiG4LT5JMCFRITL2FwaS92MS9hdHRhY2htZW50cxJ6Cg1HZXRBdHRhY2htZW50EiIubWVtb3MuYXBpLnYxLkdldEF0dGFjaG1lbnRSZXF1ZXN0GhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQiK9pBBG5hbWWC0+STAh4SHC9hcGkvdjEve25hbWU9YXR0YWNobWVudHMvKn0SqQEKEFVwZGF0ZUF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuVXBkYXRlQXR0YWNobWVudFJlcXVlc3QaGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudCJU2kEWYXR0YWNobWVudCx1cGRhdGVfbWFza4LT5JMCNToKYXR0YWNobWVudDInL2FwaS92MS97YXR0YWNobWVudC5uYW1lPWF0dGFjaG1lbnRzLyp9En4KEERlbGV0ZUF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuRGVsZXRlQXR0YWNobWVudFJlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiK9pBBG5hbWWC0+STAh4qHC9hcGkvdjEve25hbWU9YXR0YWNobWVudHMvKn0SiQEKFkJhdGNoRGVsZXRlQXR0YWNobWVudHMSKy5tZW1vcy5hcGkudjEuQmF0Y2hEZWxldGVBdHRhY2htZW50c1JlcXVlc3QaFi5nb29nbGUucHJvdG9idWYuRW1wdHkiKoLT5JMCJDoBKiIfL2FwaS92MS9hdHRhY2htZW50czpiYXRjaERlbGV0ZUKuAQoQY29tLm1lbW9zLmFwaS52MUIWQXR0YWNobWVudFNlcnZpY2VQcm90b1ABWjBnaXRodWIuY29tL3VzZW1lbW9zL21lbW9zL3Byb3RvL2dlbi9hcGkvdjE7YXBpdjGiAgNNQViqAgxNZW1vcy5BcGkuVjHKAgxNZW1vc1xBcGlcVjHiAhhNZW1vc1xBcGlcVjFcR1BCTWV0YWRhdGHqAg5NZW1vczo6QXBpOjpWMWIGcHJvdG8z", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp]);
+  fileDesc("Ch9hcGkvdjEvYXR0YWNobWVudF9zZXJ2aWNlLnByb3RvEgxtZW1vcy5hcGkudjEivAEKC01vdGlvbk1lZGlhEi8KBmZhbWlseRgBIAEoDjIfLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUZhbWlseRIrCgRyb2xlGAIgASgOMh0ubWVtb3MuYXBpLnYxLk1vdGlvbk1lZGlhUm9sZRIQCghncm91cF9pZBgDIAEoCRIhChlwcmVzZW50YXRpb25fdGltZXN0YW1wX3VzGAQgASgDEhoKEmhhc19lbWJlZGRlZF92aWRlbxgFIAEoCCK0AQoNTWVkaWFNZXRhZGF0YRISCgV3aWR0aBgBIAEoBUgBiAEBEhMKBmhlaWdodBgCIAEoBUgCiAEBEiwKBXBob3RvGAMgASgLMhsubWVtb3MuYXBpLnYxLlBob3RvTWV0YWRhdGFIABIsCgV2aWRlbxgEIAEoCzIbLm1lbW9zLmFwaS52MS5WaWRlb01ldGFkYXRhSABCCQoHZGV0YWlsc0IICgZfd2lkdGhCCQoHX2hlaWdodCKjAwoNUGhvdG9NZXRhZGF0YRI0CgxjYXB0dXJlX3RpbWUYASABKAsyHi5tZW1vcy5hcGkudjEuTWVkaWFDYXB0dXJlVGltZRItCghsb2NhdGlvbhgCIAEoCzIbLm1lbW9zLmFwaS52MS5NZWRpYUxvY2F0aW9uEiQKF3NvdXJjZV9leGlmX29yaWVudGF0aW9uGAMgASgFSACIAQESEwoLY2FtZXJhX21ha2UYBCABKAkSFAoMY2FtZXJhX21vZGVsGAUgASgJEhIKCmxlbnNfbW9kZWwYBiABKAkSFQoIZl9udW1iZXIYByABKAFIAYgBARIiChVleHBvc3VyZV90aW1lX3NlY29uZHMYCCABKAFIAogBARIQCgNpc28YCSABKAVIA4gBARIcCg9mb2NhbF9sZW5ndGhfbW0YCiABKAFIBIgBAUIaChhfc291cmNlX2V4aWZfb3JpZW50YXRpb25CCwoJX2ZfbnVtYmVyQhgKFl9leHBvc3VyZV90aW1lX3NlY29uZHNCBgoEX2lzb0ISChBfZm9jYWxfbGVuZ3RoX21tIlMKEE1lZGlhQ2FwdHVyZVRpbWUSFwoPbG9jYWxfZGF0ZV90aW1lGAEgASgJEhcKCnV0Y19vZmZzZXQYAiABKAlIAIgBAUINCgtfdXRjX29mZnNldCKLAQoNTWVkaWFMb2NhdGlvbhIVCghsYXRpdHVkZRgBIAEoAUgAiAEBEhYKCWxvbmdpdHVkZRgCIAEoAUgBiAEBEhwKD2FsdGl0dWRlX21ldGVycxgDIAEoAUgCiAEBQgsKCV9sYXRpdHVkZUIMCgpfbG9uZ2l0dWRlQhIKEF9hbHRpdHVkZV9tZXRlcnMiQwoNVmlkZW9NZXRhZGF0YRIdChBkdXJhdGlvbl9zZWNvbmRzGAEgASgBSACIAQFCEwoRX2R1cmF0aW9uX3NlY29uZHMiqQMKCkF0dGFjaG1lbnQSEQoEbmFtZRgBIAEoCUID4EEIEjQKC2NyZWF0ZV90aW1lGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLlRpbWVzdGFtcEID4EEDEhUKCGZpbGVuYW1lGAMgASgJQgPgQQISFAoHY29udGVudBgEIAEoDEID4EEEEhoKDWV4dGVybmFsX2xpbmsYBSABKAlCA+BBARIRCgR0eXBlGAYgASgJQgPgQQISEQoEc2l6ZRgHIAEoA0ID4EEDEhYKBG1lbW8YCCABKAlCA+BBAUgAiAEBEjQKDG1vdGlvbl9tZWRpYRgJIAEoCzIZLm1lbW9zLmFwaS52MS5Nb3Rpb25NZWRpYUID4EEBEjsKDm1lZGlhX21ldGFkYXRhGAogASgLMhsubWVtb3MuYXBpLnYxLk1lZGlhTWV0YWRhdGFCBuBBAeBBBTpP6kFMChdtZW1vcy5hcGkudjEvQXR0YWNobWVudBIYYXR0YWNobWVudHMve2F0dGFjaG1lbnR9KgthdHRhY2htZW50czIKYXR0YWNobWVudEIHCgVfbWVtbyJoChdDcmVhdGVBdHRhY2htZW50UmVxdWVzdBIxCgphdHRhY2htZW50GAEgASgLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRCA+BBAhIaCg1hdHRhY2htZW50X2lkGAIgASgJQgPgQQEitQEKF1VwbG9hZEF0dGFjaG1lbnRSZXF1ZXN0EjIKBHNwZWMYASABKAsyIi5tZW1vcy5hcGkudjEuVXBsb2FkQXR0YWNobWVudFNwZWNIABITCgl1cGxvYWRfaWQYAiABKAlIABIZCgx3cml0ZV9vZmZzZXQYAyABKANCA+BBAhIRCgRkYXRhGAQgASgMQgPgQQESGQoMZmluaXNoX3dyaXRlGAUgASgIQgPgQQFCCAoGdXBsb2FkIn4KFFVwbG9hZEF0dGFjaG1lbnRTcGVjEjEKCmF0dGFjaG1lbnQYASABKAsyGC5tZW1vcy5hcGkudjEuQXR0YWNobWVudEID4EECEhoKDWF0dGFjaG1lbnRfaWQYAiABKAlCA+BBARIXCgp0b3RhbF9zaXplGAMgASgDQgPgQQEiiwEKGFVwbG9hZEF0dGFjaG1lbnRSZXNwb25zZRIRCgl1cGxvYWRfaWQYASABKAkSFgoOY29tbWl0dGVkX3NpemUYAiABKAMSLAoKYXR0YWNobWVudBgDIAEoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50EhYKDm1heF9jaHVua19zaXplGAQgASgFIpQBChZMaXN0QXR0YWNobWVudHNSZXF1ZXN0EhYKCXBhZ2Vfc2l6ZRgBIAEoBUID4EEBEhcKCnBhZ2VfdG9rZW4YAiABKAlCA+BBARITCgZmaWx0ZXIYAyABKAlCA+BBARIVCghvcmRlcl9ieRgEIAEoCUID4EEBSgQIBRAGSgQIBhAHUgVzcGFjZVIKdW5hc3NpZ25lZCJhChdMaXN0QXR0YWNobWVudHNSZXNwb25zZRItCgthdHRhY2htZW50cxgBIAMoCzIYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50EhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSJFChRHZXRBdHRhY2htZW50UmVxdWVzdBItCgRuYW1lGAEgASgJQh/gQQL6QRkKF21lbW9zLmFwaS52MS9BdHRhY2htZW50IoIBChdVcGRhdGVBdHRhY2htZW50UmVxdWVzdBIxCgphdHRhY2htZW50GAEgASgLMhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRCA+BBAhI0Cgt1cGRhdGVfbWFzaxgCIAEoCzIaLmdvb2dsZS5wcm90b2J1Zi5GaWVsZE1hc2tCA+BBAiJIChdEZWxldGVBdHRhY2htZW50UmVxdWVzdBItCgRuYW1lGAEgASgJQh/gQQL6QRkKF21lbW9zLmFwaS52MS9BdHRhY2htZW50IjMKHUJhdGNoRGVsZXRlQXR0YWNobWVudHNSZXF1ZXN0EhIKBW5hbWVzGAEgAygJQgPgQQIi5gEKD0F0dGFjaG1lbnRRdW90YRIRCgRuYW1lGAEgASgJQgPgQQgSFwoKdXNlZF9ieXRlcxgCIAEoA0ID4EEDEhMKC2xpbWl0X2J5dGVzGAMgASgDEhwKD3JlbWFpbmluZ19ieXRlcxgEIAEoA0ID4EEDEhQKB2VuYWJsZWQYBSABKAhCA+BBAxIdChBsaW1pdF9vdmVycmlkZGVuGAYgASgIQgPgQQM6P+pBPAocbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnRRdW90YRIcdXNlcnMve3VzZXJ9L2F0dGFjaG1lbnRRdW90YSKNAQoWQXR0YWNobWVudFF1b3RhRGV0YWlscxISCgp1c2VkX2J5dGVzGAEgASgDEhMKC2xpbWl0X2J5dGVzGAIgASgDEhcKD3JlbWFpbmluZ19ieXRlcxgDIAEoAxIXCg9yZXF1ZXN0ZWRfYnl0ZXMYBCABKAMSGAoQbGltaXRfb3ZlcnJpZGRlbhgFIAEoCCJPChlHZXRBdHRhY2htZW50UXVvdGFSZXF1ZXN0EjIKBG5hbWUYASABKAlCJOBBAvpBHgocbWVtb3MuYXBpLnYxL0F0dGFjaG1lbnRRdW90YSJOChtMaXN0QXR0YWNobWVudFF1b3Rhc1JlcXVlc3QSFgoJcGFnZV9zaXplGAEgASgFQgPgQQESFwoKcGFnZV90b2tlbhgCIAEoCUID4EEBInEKHExpc3RBdHRhY2htZW50UXVvdGFzUmVzcG9uc2USOAoRYXR0YWNobWVudF9xdW90YXMYASADKAsyHS5tZW1vcy5hcGkudjEuQXR0YWNobWVudFF1b3RhEhcKD25leHRfcGFnZV90b2tlbhgCIAEoCSKSAQocVXBkYXRlQXR0YWNobWVudFF1b3RhUmVxdWVzdBI8ChBhdHRhY2htZW50X3F1b3RhGAEgASgLMh0ubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRRdW90YUID4EECEjQKC3VwZGF0ZV9tYXNrGAIgASgLMhouZ29vZ2xlLnByb3RvYnVmLkZpZWxkTWFza0ID4EECKmgKEU1vdGlvbk1lZGlhRmFtaWx5EiMKH01PVElPTl9NRURJQV9GQU1JTFlfVU5TUEVDSUZJRUQQABIUChBBUFBMRV9MSVZFX1BIT1RPEAESGAoUQU5EUk9JRF9NT1RJT05fUEhPVE8QAipZCg9Nb3Rpb25NZWRpYVJvbGUSIQodTU9USU9OX01FRElBX1JPTEVfVU5TUEVDSUZJRUQQABIJCgVTVElMTBABEgkKBVZJREVPEAISDQoJQ09OVEFJTkVSEAMy2gsKEUF0dGFjaG1lbnRTZXJ2aWNlEokBChBDcmVhdGVBdHRhY2htZW50EiUubWVtb3MuYXBpLnYxLkNyZWF0ZUF0dGFjaG1lbnRSZXF1ZXN0GhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQiNNpBCmF0dGFjaG1lbnSC0+STAiE6CmF0dGFjaG1lbnQiEy9hcGkvdjEvYXR0YWNobWVudHMSiAEKEFVwbG9hZEF0dGFjaG1lbnQSJS5tZW1vcy5hcGkudjEuVXBsb2FkQXR0YWNobWVudFJlcXVlc3QaJi5tZW1vcy5hcGkudjEuVXBsb2FkQXR0YWNobWVudFJlc3BvbnNlIiWC0+STAh86ASoiGi9hcGkvdjEvYXR0YWNobWVudHM6dXBsb2FkEnsKD0xpc3RBdHRhY2htZW50cxIkLm1lbW9zLmFwaS52MS5MaXN0QXR0YWNobWVudHNSZXF1ZXN0GiUubWVtb3MuYXBpLnYxLkxpc3RBdHRhY2htZW50c1Jlc3BvbnNlIhuC0+STAhUSEy9hcGkvdjEvYXR0YWNobWVudHMSegoNR2V0QXR0YWNobWVudBIiLm1lbW9zLmFwaS52MS5HZXRBdHRhY2htZW50UmVxdWVzdBoYLm1lbW9zLmFwaS52MS5BdHRhY2htZW50IivaQQRuYW1lgtPkkwIeEhwvYXBpL3YxL3tuYW1lPWF0dGFjaG1lbnRzLyp9EqkBChBVcGRhdGVBdHRhY2htZW50EiUubWVtb3MuYXBpLnYxLlVwZGF0ZUF0dGFjaG1lbnRSZXF1ZXN0GhgubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnQiVNpBFmF0dGFjaG1lbnQsdXBkYXRlX21hc2uC0+STAjU6CmF0dGFjaG1lbnQyJy9hcGkvdjEve2F0dGFjaG1lbnQubmFtZT1hdHRhY2htZW50cy8qfRJ+ChBEZWxldGVBdHRhY2htZW50EiUubWVtb3MuYXBpLnYxLkRlbGV0ZUF0dGFjaG1lbnRSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IivaQQRuYW1lgtPkkwIeKhwvYXBpL3YxL3tuYW1lPWF0dGFjaG1lbnRzLyp9EokBChZCYXRjaERlbGV0ZUF0dGFjaG1lbnRzEisubWVtb3MuYXBpLnYxLkJhdGNoRGVsZXRlQXR0YWNobWVudHNSZXF1ZXN0GhYuZ29vZ2xlLnByb3RvYnVmLkVtcHR5IiqC0+STAiQ6ASoiHy9hcGkvdjEvYXR0YWNobWVudHM6YmF0Y2hEZWxldGUSkwEKEkdldEF0dGFjaG1lbnRRdW90YRInLm1lbW9zLmFwaS52MS5HZXRBdHRhY2htZW50UXVvdGFSZXF1ZXN0Gh0ubWVtb3MuYXBpLnYxLkF0dGFjaG1lbnRRdW90YSI12kEEbmFtZYLT5JMCKBImL2FwaS92MS97bmFtZT11c2Vycy8qL2F0dGFjaG1lbnRRdW90YX0SjwEKFExpc3RBdHRhY2htZW50UXVvdGFzEikubWVtb3MuYXBpLnYxLkxpc3RBdHRhY2htZW50UXVvdGFzUmVxdWVzdBoqLm1lbW9zLmFwaS52MS5MaXN0QXR0YWNobWVudFF1b3Rhc1Jlc3BvbnNlIiCC0+STAhoSGC9hcGkvdjEvYXR0YWNobWVudFF1b3RhcxLUAQoVVXBkYXRlQXR0YWNobWVudFF1b3RhEioubWVtb3MuYXBpLnYxLlVwZGF0ZUF0dGFjaG1lbnRRdW90YVJlcXVlc3QaHS5tZW1vcy5hcGkudjEuQXR0YWNobWVudFF1b3RhInDaQRxhdHRhY2htZW50X3F1b3RhLHVwZGF0ZV9tYXNrgtPkkwJLOhBhdHRhY2htZW50X3F1b3RhMjcvYXBpL3YxL3thdHRhY2htZW50X3F1b3RhLm5hbWU9dXNlcnMvKi9hdHRhY2htZW50UXVvdGF9Qq4BChBjb20ubWVtb3MuYXBpLnYxQhZBdHRhY2htZW50U2VydmljZVByb3RvUAFaMGdpdGh1Yi5jb20vdXNlbWVtb3MvbWVtb3MvcHJvdG8vZ2VuL2FwaS92MTthcGl2MaICA01BWKoCDE1lbW9zLkFwaS5WMcoCDE1lbW9zXEFwaVxWMeICGE1lbW9zXEFwaVxWMVxHUEJNZXRhZGF0YeoCDk1lbW9zOjpBcGk6OlYxYgZwcm90bzM", [file_google_api_annotations, file_google_api_client, file_google_api_field_behavior, file_google_api_resource, file_google_protobuf_empty, file_google_protobuf_field_mask, file_google_protobuf_timestamp]);
 
 /**
  * @generated from message memos.api.v1.MotionMedia
@@ -661,6 +661,217 @@ export const BatchDeleteAttachmentsRequestSchema: GenMessage<BatchDeleteAttachme
   messageDesc(file_api_v1_attachment_service, 16);
 
 /**
+ * AttachmentQuota is the per-user attachment byte quota state.
+ *
+ * @generated from message memos.api.v1.AttachmentQuota
+ */
+export type AttachmentQuota = Message<"memos.api.v1.AttachmentQuota"> & {
+  /**
+   * The resource name. Format: users/{user}/attachmentQuota
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+
+  /**
+   * Output only. Persisted attachment bytes owned by the user, summed across
+   * linked and unlinked attachments in every storage backend.
+   *
+   * @generated from field: int64 used_bytes = 2;
+   */
+  usedBytes: bigint;
+
+  /**
+   * The effective limit in bytes. A zero limit blocks every new upload.
+   * When enabled is false, quota enforcement is off and this field is -1.
+   * Input only on update: a value of -1 in update_mask clears the override
+   * and restores inheritance from the instance default.
+   *
+   * @generated from field: int64 limit_bytes = 3;
+   */
+  limitBytes: bigint;
+
+  /**
+   * Output only. Bytes still available, clamped at zero. -1 when the quota
+   * is disabled.
+   *
+   * @generated from field: int64 remaining_bytes = 4;
+   */
+  remainingBytes: bigint;
+
+  /**
+   * Output only. Whether a quota limit is currently enforced (the instance
+   * default is enabled or an explicit per-user override is set).
+   *
+   * @generated from field: bool enabled = 5;
+   */
+  enabled: boolean;
+
+  /**
+   * Output only. Whether limit_bytes comes from a per-user override instead
+   * of the instance default.
+   *
+   * @generated from field: bool limit_overridden = 6;
+   */
+  limitOverridden: boolean;
+};
+
+/**
+ * Describes the message memos.api.v1.AttachmentQuota.
+ * Use `create(AttachmentQuotaSchema)` to create a new message.
+ */
+export const AttachmentQuotaSchema: GenMessage<AttachmentQuota> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 17);
+
+/**
+ * AttachmentQuotaDetails carries the quota state on a quota-exceeded error.
+ * It is attached as a rich error detail alongside errdetails.ErrorInfo.
+ *
+ * @generated from message memos.api.v1.AttachmentQuotaDetails
+ */
+export type AttachmentQuotaDetails = Message<"memos.api.v1.AttachmentQuotaDetails"> & {
+  /**
+   * Persisted bytes owned by the user when the write was rejected.
+   *
+   * @generated from field: int64 used_bytes = 1;
+   */
+  usedBytes: bigint;
+
+  /**
+   * The effective limit in bytes at rejection time.
+   *
+   * @generated from field: int64 limit_bytes = 2;
+   */
+  limitBytes: bigint;
+
+  /**
+   * Bytes still available, clamped at zero (zero once the user is over limit).
+   *
+   * @generated from field: int64 remaining_bytes = 3;
+   */
+  remainingBytes: bigint;
+
+  /**
+   * Bytes the rejected write attempted to add.
+   *
+   * @generated from field: int64 requested_bytes = 4;
+   */
+  requestedBytes: bigint;
+
+  /**
+   * Whether the limit came from a per-user override.
+   *
+   * @generated from field: bool limit_overridden = 5;
+   */
+  limitOverridden: boolean;
+};
+
+/**
+ * Describes the message memos.api.v1.AttachmentQuotaDetails.
+ * Use `create(AttachmentQuotaDetailsSchema)` to create a new message.
+ */
+export const AttachmentQuotaDetailsSchema: GenMessage<AttachmentQuotaDetails> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 18);
+
+/**
+ * @generated from message memos.api.v1.GetAttachmentQuotaRequest
+ */
+export type GetAttachmentQuotaRequest = Message<"memos.api.v1.GetAttachmentQuotaRequest"> & {
+  /**
+   * Required. Format: users/{user}/attachmentQuota
+   *
+   * @generated from field: string name = 1;
+   */
+  name: string;
+};
+
+/**
+ * Describes the message memos.api.v1.GetAttachmentQuotaRequest.
+ * Use `create(GetAttachmentQuotaRequestSchema)` to create a new message.
+ */
+export const GetAttachmentQuotaRequestSchema: GenMessage<GetAttachmentQuotaRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 19);
+
+/**
+ * @generated from message memos.api.v1.ListAttachmentQuotasRequest
+ */
+export type ListAttachmentQuotasRequest = Message<"memos.api.v1.ListAttachmentQuotasRequest"> & {
+  /**
+   * Optional. The maximum number of quotas to return.
+   *
+   * @generated from field: int32 page_size = 1;
+   */
+  pageSize: number;
+
+  /**
+   * Optional. A page token from a previous call.
+   *
+   * @generated from field: string page_token = 2;
+   */
+  pageToken: string;
+};
+
+/**
+ * Describes the message memos.api.v1.ListAttachmentQuotasRequest.
+ * Use `create(ListAttachmentQuotasRequestSchema)` to create a new message.
+ */
+export const ListAttachmentQuotasRequestSchema: GenMessage<ListAttachmentQuotasRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 20);
+
+/**
+ * @generated from message memos.api.v1.ListAttachmentQuotasResponse
+ */
+export type ListAttachmentQuotasResponse = Message<"memos.api.v1.ListAttachmentQuotasResponse"> & {
+  /**
+   * The quota states, ordered by user id.
+   *
+   * @generated from field: repeated memos.api.v1.AttachmentQuota attachment_quotas = 1;
+   */
+  attachmentQuotas: AttachmentQuota[];
+
+  /**
+   * A token to retrieve the next page. Omitted when there are no more pages.
+   *
+   * @generated from field: string next_page_token = 2;
+   */
+  nextPageToken: string;
+};
+
+/**
+ * Describes the message memos.api.v1.ListAttachmentQuotasResponse.
+ * Use `create(ListAttachmentQuotasResponseSchema)` to create a new message.
+ */
+export const ListAttachmentQuotasResponseSchema: GenMessage<ListAttachmentQuotasResponse> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 21);
+
+/**
+ * @generated from message memos.api.v1.UpdateAttachmentQuotaRequest
+ */
+export type UpdateAttachmentQuotaRequest = Message<"memos.api.v1.UpdateAttachmentQuotaRequest"> & {
+  /**
+   * Required. The quota state to update; only name and limit_bytes are read.
+   *
+   * @generated from field: memos.api.v1.AttachmentQuota attachment_quota = 1;
+   */
+  attachmentQuota?: AttachmentQuota | undefined;
+
+  /**
+   * Required. Must contain "limit_bytes". limit_bytes of -1 clears the
+   * per-user override; non-negative values set it (zero blocks all uploads).
+   *
+   * @generated from field: google.protobuf.FieldMask update_mask = 2;
+   */
+  updateMask?: FieldMask | undefined;
+};
+
+/**
+ * Describes the message memos.api.v1.UpdateAttachmentQuotaRequest.
+ * Use `create(UpdateAttachmentQuotaRequestSchema)` to create a new message.
+ */
+export const UpdateAttachmentQuotaRequestSchema: GenMessage<UpdateAttachmentQuotaRequest> = /*@__PURE__*/
+  messageDesc(file_api_v1_attachment_service, 22);
+
+/**
  * @generated from enum memos.api.v1.MotionMediaFamily
  */
 export enum MotionMediaFamily {
@@ -793,6 +1004,39 @@ export const AttachmentService: GenService<{
     methodKind: "unary";
     input: typeof BatchDeleteAttachmentsRequestSchema;
     output: typeof EmptySchema;
+  },
+  /**
+   * GetAttachmentQuota returns the attachment byte quota state of one user.
+   * Users may read their own quota; instance administrators may read any user.
+   *
+   * @generated from rpc memos.api.v1.AttachmentService.GetAttachmentQuota
+   */
+  getAttachmentQuota: {
+    methodKind: "unary";
+    input: typeof GetAttachmentQuotaRequestSchema;
+    output: typeof AttachmentQuotaSchema;
+  },
+  /**
+   * ListAttachmentQuotas returns the attachment quota states of all users.
+   * Instance administrators only.
+   *
+   * @generated from rpc memos.api.v1.AttachmentService.ListAttachmentQuotas
+   */
+  listAttachmentQuotas: {
+    methodKind: "unary";
+    input: typeof ListAttachmentQuotasRequestSchema;
+    output: typeof ListAttachmentQuotasResponseSchema;
+  },
+  /**
+   * UpdateAttachmentQuota sets or clears the per-user attachment quota
+   * override. Instance administrators only.
+   *
+   * @generated from rpc memos.api.v1.AttachmentService.UpdateAttachmentQuota
+   */
+  updateAttachmentQuota: {
+    methodKind: "unary";
+    input: typeof UpdateAttachmentQuotaRequestSchema;
+    output: typeof AttachmentQuotaSchema;
   },
 }> = /*@__PURE__*/
   serviceDesc(file_api_v1_attachment_service, 0);

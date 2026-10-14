@@ -69,6 +69,9 @@ func (d *DB) CreateUserWithIdentity(ctx context.Context, createUser *store.User,
 	if err := insertUserIdentity(ctx, tx, createIdentity); err != nil {
 		return nil, errors.Wrap(err, "failed to create user identity")
 	}
+	if err := ensureSQLiteUserAttachmentQuotaRow(ctx, tx, createUser.ID); err != nil {
+		return nil, errors.Wrap(err, "failed to create attachment quota row")
+	}
 
 	if err := tx.Commit(); err != nil {
 		return nil, errors.Wrap(err, "failed to commit user identity transaction")

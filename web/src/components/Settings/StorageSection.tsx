@@ -206,6 +206,19 @@ const StorageSection = () => {
     );
   };
 
+  const handleAttachmentQuotaLimitChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
+    let num = parseInt(event.target.value);
+    if (Number.isNaN(num) || num < 0) {
+      num = 0;
+    }
+    setInstanceStorageSetting((current) =>
+      create(InstanceSetting_StorageSettingSchema, {
+        ...current,
+        attachmentQuotaLimitBytes: BigInt(Math.round(num * 1024 * 1024)),
+      }),
+    );
+  };
+
   const handleFilepathTemplateChanged = (event: React.ChangeEvent<HTMLInputElement>) => {
     setInstanceStorageSetting((current) =>
       create(InstanceSetting_StorageSettingSchema, {
@@ -363,6 +376,20 @@ const StorageSection = () => {
             value={String(instanceStorageSetting.uploadSizeLimitMb)}
             onChange={handleMaxUploadSizeChanged}
           />
+        </SettingRow>
+
+        <SettingRow
+          label={t("setting.storage.attachment-quota-limit")}
+          tooltip={t("setting.storage.attachment-quota-limit-hint")}
+        >
+          <div className="flex items-center gap-2">
+            <Input
+              className="w-24 font-mono"
+              value={String(Number(instanceStorageSetting.attachmentQuotaLimitBytes ?? 0n) / (1024 * 1024))}
+              onChange={handleAttachmentQuotaLimitChanged}
+            />
+            <span className="text-sm text-muted-foreground">MiB</span>
+          </div>
         </SettingRow>
 
         {selectedStorageType !== InstanceSetting_StorageType.DATABASE && (

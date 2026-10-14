@@ -825,8 +825,12 @@ type InstanceStorageSetting struct {
 	Storages []*Storage `protobuf:"bytes,5,rep,name=storages,proto3" json:"storages,omitempty"`
 	// default_storage_id identifies the storage used for new attachments.
 	DefaultStorageId string `protobuf:"bytes,6,opt,name=default_storage_id,json=defaultStorageId,proto3" json:"default_storage_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// attachment_quota_limit_bytes is the default per-user attachment quota in bytes.
+	// Zero (the default) disables per-user quota enforcement; a positive value is
+	// the byte limit applied to every user without an explicit per-user override.
+	AttachmentQuotaLimitBytes int64 `protobuf:"varint,7,opt,name=attachment_quota_limit_bytes,json=attachmentQuotaLimitBytes,proto3" json:"attachment_quota_limit_bytes,omitempty"`
+	unknownFields             protoimpl.UnknownFields
+	sizeCache                 protoimpl.SizeCache
 }
 
 func (x *InstanceStorageSetting) Reset() {
@@ -899,6 +903,13 @@ func (x *InstanceStorageSetting) GetDefaultStorageId() string {
 		return x.DefaultStorageId
 	}
 	return ""
+}
+
+func (x *InstanceStorageSetting) GetAttachmentQuotaLimitBytes() int64 {
+	if x != nil {
+		return x.AttachmentQuotaLimitBytes
+	}
+	return 0
 }
 
 // Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/
@@ -1628,14 +1639,15 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\x04type\x18\x03 \x01(\x0e2\x18.memos.store.StorageTypeR\x04type\x12;\n" +
 	"\ts3_config\x18\n" +
 	" \x01(\v2\x1c.memos.store.StorageS3ConfigH\x00R\bs3ConfigB\b\n" +
-	"\x06config\"\xb3\x03\n" +
+	"\x06config\"\xf4\x03\n" +
 	"\x16InstanceStorageSetting\x12R\n" +
 	"\fstorage_type\x18\x01 \x01(\x0e2/.memos.store.InstanceStorageSetting.StorageTypeR\vstorageType\x12+\n" +
 	"\x11filepath_template\x18\x02 \x01(\tR\x10filepathTemplate\x12/\n" +
 	"\x14upload_size_limit_mb\x18\x03 \x01(\x03R\x11uploadSizeLimitMb\x129\n" +
 	"\ts3_config\x18\x04 \x01(\v2\x1c.memos.store.StorageS3ConfigR\bs3Config\x120\n" +
 	"\bstorages\x18\x05 \x03(\v2\x14.memos.store.StorageR\bstorages\x12,\n" +
-	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\"L\n" +
+	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\x12?\n" +
+	"\x1cattachment_quota_limit_bytes\x18\a \x01(\x03R\x19attachmentQuotaLimitBytes\"L\n" +
 	"\vStorageType\x12\x1c\n" +
 	"\x18STORAGE_TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bDATABASE\x10\x01\x12\t\n" +

@@ -83,6 +83,9 @@ func (d *DB) ApplyMemoMutation(ctx context.Context, mutation *store.MemoMutation
 			return errors.Wrap(store.ErrMemoMutationConflict, "attachment is no longer removable from the memo")
 		}
 	}
+	if err := decrementPostgresAttachmentQuotaTx(ctx, tx, mutation.RemovedAttachmentIDs); err != nil {
+		return err
+	}
 
 	for _, binding := range mutation.Bindings {
 		var attachmentCreatorID int32

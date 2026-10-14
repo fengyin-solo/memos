@@ -12,7 +12,13 @@ import (
 )
 
 func (d *DB) CreateUser(ctx context.Context, create *store.User) (*store.User, error) {
-	result, err := insertUser(ctx, d.db, create)
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+
+	result, err := insertUser(ctx, tx, create)
 	if err != nil {
 		return nil, err
 	}
@@ -23,6 +29,13 @@ func (d *DB) CreateUser(ctx context.Context, create *store.User) (*store.User, e
 	}
 
 	id32 := int32(id)
+	if err := ensureMySQLUserAttachmentQuotaRow(ctx, tx, id32); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+
 	list, err := d.ListUsers(ctx, &store.FindUser{ID: &id32})
 	if err != nil {
 		return nil, err

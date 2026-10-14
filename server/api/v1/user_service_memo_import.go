@@ -124,6 +124,27 @@ type memoImporter struct {
 	// the importer's Space list, loaded on first use.
 	spaces       map[string]*int32
 	memberSpaces []*store.Space
+
+	// quotaState caches the importer's per-user quota state. The insert
+	// transaction remains the authoritative gate; this drives the early
+	// precheck and the enforced limit.
+	quotaState *attachmentQuotaState
+}
+
+// attachmentImportQuotaLimit early-rejects an import attachment that would
+// cross the user's quota and returns the limit to enforce in the store.
+func (i *memoImporter) attachmentImportQuotaLimit(size int64) (*int64, error) {
+	if i.quotaState == nil {
+		state, err := i.service.getAttachmentQuotaState(i.ctx, i.user.ID)
+		if err != nil {
+			return nil, err
+		}
+		i.quotaState = state
+	}
+	if err := checkAttachmentQuotaBeforeWrite(i.quotaState, size); err != nil {
+		return nil, err
+	}
+	return i.quotaState.limitForCreate(), nil
 }
 
 // ImportMemoExport applies an opened archive to the importing user's memos
@@ -487,17 +508,22 @@ func (i *memoImporter) importAttachment(entry *memoexport.Attachment) (string, b
 // storeAttachment writes a new attachment for the entry under uid.
 func (i *memoImporter) storeAttachment(entry *memoexport.Attachment, uid, mimeType string) (string, error) {
 	if entry.ExternalLink != "" {
+		limit, err := i.attachmentImportQuotaLimit(entry.Size)
+		if err != nil {
+			return "", err
+		}
 		attachment, err := i.service.Store.CreateAttachment(i.ctx, &store.Attachment{
-			UID:         uid,
-			CreatorID:   i.user.ID,
-			Filename:    entry.Filename,
-			Type:        mimeType,
-			Size:        entry.Size,
-			StorageType: storepb.AttachmentStorageType_EXTERNAL,
-			Reference:   entry.ExternalLink,
+			UID:             uid,
+			CreatorID:       i.user.ID,
+			Filename:        entry.Filename,
+			Type:            mimeType,
+			Size:            entry.Size,
+			StorageType:     storepb.AttachmentStorageType_EXTERNAL,
+			Reference:       entry.ExternalLink,
+			QuotaLimitBytes: limit,
 		})
 		if err != nil {
-			return "", errors.Wrap(err, "failed to create external attachment")
+			return "", mapAttachmentQuotaCreateError(i.ctx, i.service, i.user.ID, entry.Size, err)
 		}
 		return AttachmentNamePrefix + attachment.UID, nil
 	}
@@ -508,12 +534,17 @@ func (i *memoImporter) storeAttachment(entry *memoexport.Attachment, uid, mimeTy
 	if err != nil {
 		return "", err
 	}
+	limit, err := i.attachmentImportQuotaLimit(int64(len(data)))
+	if err != nil {
+		return "", err
+	}
 	create := &store.Attachment{
-		UID:       uid,
-		CreatorID: i.user.ID,
-		Filename:  entry.Filename,
-		Type:      mimeType,
-		Size:      int64(len(data)),
+		UID:             uid,
+		CreatorID:       i.user.ID,
+		Filename:        entry.Filename,
+		Type:            mimeType,
+		Size:            int64(len(data)),
+		QuotaLimitBytes: limit,
 	}
 	if len(entry.MediaMetadata) > 0 {
 		metadata := &v1pb.MediaMetadata{}

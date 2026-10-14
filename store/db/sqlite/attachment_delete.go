@@ -36,6 +36,9 @@ func (d *DB) DeleteAttachmentsWithPolicy(ctx context.Context, policy *store.Atta
 	if err := authorizeSQLiteAttachmentMutation(ctx, tx, policy.ActorUserID, actor.Admin, memoIDs, policy.ExpectedMemoContents); err != nil {
 		return err
 	}
+	if err := decrementSQLiteAttachmentQuotaTx(ctx, tx, attachmentIDs); err != nil {
+		return err
+	}
 
 	for _, attachmentID := range attachmentIDs {
 		result, err := tx.ExecContext(ctx, "DELETE FROM attachment WHERE id = ?", attachmentID)

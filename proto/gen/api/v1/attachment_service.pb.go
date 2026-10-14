@@ -1357,6 +1357,395 @@ func (x *BatchDeleteAttachmentsRequest) GetNames() []string {
 	return nil
 }
 
+// AttachmentQuota is the per-user attachment byte quota state.
+type AttachmentQuota struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The resource name. Format: users/{user}/attachmentQuota
+	Name string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	// Output only. Persisted attachment bytes owned by the user, summed across
+	// linked and unlinked attachments in every storage backend.
+	UsedBytes int64 `protobuf:"varint,2,opt,name=used_bytes,json=usedBytes,proto3" json:"used_bytes,omitempty"`
+	// The effective limit in bytes. A zero limit blocks every new upload.
+	// When enabled is false, quota enforcement is off and this field is -1.
+	// Input only on update: a value of -1 in update_mask clears the override
+	// and restores inheritance from the instance default.
+	LimitBytes int64 `protobuf:"varint,3,opt,name=limit_bytes,json=limitBytes,proto3" json:"limit_bytes,omitempty"`
+	// Output only. Bytes still available, clamped at zero. -1 when the quota
+	// is disabled.
+	RemainingBytes int64 `protobuf:"varint,4,opt,name=remaining_bytes,json=remainingBytes,proto3" json:"remaining_bytes,omitempty"`
+	// Output only. Whether a quota limit is currently enforced (the instance
+	// default is enabled or an explicit per-user override is set).
+	Enabled bool `protobuf:"varint,5,opt,name=enabled,proto3" json:"enabled,omitempty"`
+	// Output only. Whether limit_bytes comes from a per-user override instead
+	// of the instance default.
+	LimitOverridden bool `protobuf:"varint,6,opt,name=limit_overridden,json=limitOverridden,proto3" json:"limit_overridden,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AttachmentQuota) Reset() {
+	*x = AttachmentQuota{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachmentQuota) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachmentQuota) ProtoMessage() {}
+
+func (x *AttachmentQuota) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachmentQuota.ProtoReflect.Descriptor instead.
+func (*AttachmentQuota) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{17}
+}
+
+func (x *AttachmentQuota) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *AttachmentQuota) GetUsedBytes() int64 {
+	if x != nil {
+		return x.UsedBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuota) GetLimitBytes() int64 {
+	if x != nil {
+		return x.LimitBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuota) GetRemainingBytes() int64 {
+	if x != nil {
+		return x.RemainingBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuota) GetEnabled() bool {
+	if x != nil {
+		return x.Enabled
+	}
+	return false
+}
+
+func (x *AttachmentQuota) GetLimitOverridden() bool {
+	if x != nil {
+		return x.LimitOverridden
+	}
+	return false
+}
+
+// AttachmentQuotaDetails carries the quota state on a quota-exceeded error.
+// It is attached as a rich error detail alongside errdetails.ErrorInfo.
+type AttachmentQuotaDetails struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Persisted bytes owned by the user when the write was rejected.
+	UsedBytes int64 `protobuf:"varint,1,opt,name=used_bytes,json=usedBytes,proto3" json:"used_bytes,omitempty"`
+	// The effective limit in bytes at rejection time.
+	LimitBytes int64 `protobuf:"varint,2,opt,name=limit_bytes,json=limitBytes,proto3" json:"limit_bytes,omitempty"`
+	// Bytes still available, clamped at zero (zero once the user is over limit).
+	RemainingBytes int64 `protobuf:"varint,3,opt,name=remaining_bytes,json=remainingBytes,proto3" json:"remaining_bytes,omitempty"`
+	// Bytes the rejected write attempted to add.
+	RequestedBytes int64 `protobuf:"varint,4,opt,name=requested_bytes,json=requestedBytes,proto3" json:"requested_bytes,omitempty"`
+	// Whether the limit came from a per-user override.
+	LimitOverridden bool `protobuf:"varint,5,opt,name=limit_overridden,json=limitOverridden,proto3" json:"limit_overridden,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *AttachmentQuotaDetails) Reset() {
+	*x = AttachmentQuotaDetails{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AttachmentQuotaDetails) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AttachmentQuotaDetails) ProtoMessage() {}
+
+func (x *AttachmentQuotaDetails) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AttachmentQuotaDetails.ProtoReflect.Descriptor instead.
+func (*AttachmentQuotaDetails) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *AttachmentQuotaDetails) GetUsedBytes() int64 {
+	if x != nil {
+		return x.UsedBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuotaDetails) GetLimitBytes() int64 {
+	if x != nil {
+		return x.LimitBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuotaDetails) GetRemainingBytes() int64 {
+	if x != nil {
+		return x.RemainingBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuotaDetails) GetRequestedBytes() int64 {
+	if x != nil {
+		return x.RequestedBytes
+	}
+	return 0
+}
+
+func (x *AttachmentQuotaDetails) GetLimitOverridden() bool {
+	if x != nil {
+		return x.LimitOverridden
+	}
+	return false
+}
+
+type GetAttachmentQuotaRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. Format: users/{user}/attachmentQuota
+	Name          string `protobuf:"bytes,1,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAttachmentQuotaRequest) Reset() {
+	*x = GetAttachmentQuotaRequest{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAttachmentQuotaRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAttachmentQuotaRequest) ProtoMessage() {}
+
+func (x *GetAttachmentQuotaRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAttachmentQuotaRequest.ProtoReflect.Descriptor instead.
+func (*GetAttachmentQuotaRequest) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *GetAttachmentQuotaRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type ListAttachmentQuotasRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. The maximum number of quotas to return.
+	PageSize int32 `protobuf:"varint,1,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	// Optional. A page token from a previous call.
+	PageToken     string `protobuf:"bytes,2,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAttachmentQuotasRequest) Reset() {
+	*x = ListAttachmentQuotasRequest{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAttachmentQuotasRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAttachmentQuotasRequest) ProtoMessage() {}
+
+func (x *ListAttachmentQuotasRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAttachmentQuotasRequest.ProtoReflect.Descriptor instead.
+func (*ListAttachmentQuotasRequest) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ListAttachmentQuotasRequest) GetPageSize() int32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *ListAttachmentQuotasRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type ListAttachmentQuotasResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// The quota states, ordered by user id.
+	AttachmentQuotas []*AttachmentQuota `protobuf:"bytes,1,rep,name=attachment_quotas,json=attachmentQuotas,proto3" json:"attachment_quotas,omitempty"`
+	// A token to retrieve the next page. Omitted when there are no more pages.
+	NextPageToken string `protobuf:"bytes,2,opt,name=next_page_token,json=nextPageToken,proto3" json:"next_page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListAttachmentQuotasResponse) Reset() {
+	*x = ListAttachmentQuotasResponse{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListAttachmentQuotasResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListAttachmentQuotasResponse) ProtoMessage() {}
+
+func (x *ListAttachmentQuotasResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListAttachmentQuotasResponse.ProtoReflect.Descriptor instead.
+func (*ListAttachmentQuotasResponse) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{21}
+}
+
+func (x *ListAttachmentQuotasResponse) GetAttachmentQuotas() []*AttachmentQuota {
+	if x != nil {
+		return x.AttachmentQuotas
+	}
+	return nil
+}
+
+func (x *ListAttachmentQuotasResponse) GetNextPageToken() string {
+	if x != nil {
+		return x.NextPageToken
+	}
+	return ""
+}
+
+type UpdateAttachmentQuotaRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Required. The quota state to update; only name and limit_bytes are read.
+	AttachmentQuota *AttachmentQuota `protobuf:"bytes,1,opt,name=attachment_quota,json=attachmentQuota,proto3" json:"attachment_quota,omitempty"`
+	// Required. Must contain "limit_bytes". limit_bytes of -1 clears the
+	// per-user override; non-negative values set it (zero blocks all uploads).
+	UpdateMask    *fieldmaskpb.FieldMask `protobuf:"bytes,2,opt,name=update_mask,json=updateMask,proto3" json:"update_mask,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdateAttachmentQuotaRequest) Reset() {
+	*x = UpdateAttachmentQuotaRequest{}
+	mi := &file_api_v1_attachment_service_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdateAttachmentQuotaRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdateAttachmentQuotaRequest) ProtoMessage() {}
+
+func (x *UpdateAttachmentQuotaRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_api_v1_attachment_service_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdateAttachmentQuotaRequest.ProtoReflect.Descriptor instead.
+func (*UpdateAttachmentQuotaRequest) Descriptor() ([]byte, []int) {
+	return file_api_v1_attachment_service_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *UpdateAttachmentQuotaRequest) GetAttachmentQuota() *AttachmentQuota {
+	if x != nil {
+		return x.AttachmentQuota
+	}
+	return nil
+}
+
+func (x *UpdateAttachmentQuotaRequest) GetUpdateMask() *fieldmaskpb.FieldMask {
+	if x != nil {
+		return x.UpdateMask
+	}
+	return nil
+}
+
 var File_api_v1_attachment_service_proto protoreflect.FileDescriptor
 
 const file_api_v1_attachment_service_proto_rawDesc = "" +
@@ -1477,7 +1866,39 @@ const file_api_v1_attachment_service_proto_rawDesc = "" +
 	"\x04name\x18\x01 \x01(\tB\x1f\xe0A\x02\xfaA\x19\n" +
 	"\x17memos.api.v1/AttachmentR\x04name\":\n" +
 	"\x1dBatchDeleteAttachmentsRequest\x12\x19\n" +
-	"\x05names\x18\x01 \x03(\tB\x03\xe0A\x02R\x05names*h\n" +
+	"\x05names\x18\x01 \x03(\tB\x03\xe0A\x02R\x05names\"\xad\x02\n" +
+	"\x0fAttachmentQuota\x12\x17\n" +
+	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12\"\n" +
+	"\n" +
+	"used_bytes\x18\x02 \x01(\x03B\x03\xe0A\x03R\tusedBytes\x12\x1f\n" +
+	"\vlimit_bytes\x18\x03 \x01(\x03R\n" +
+	"limitBytes\x12,\n" +
+	"\x0fremaining_bytes\x18\x04 \x01(\x03B\x03\xe0A\x03R\x0eremainingBytes\x12\x1d\n" +
+	"\aenabled\x18\x05 \x01(\bB\x03\xe0A\x03R\aenabled\x12.\n" +
+	"\x10limit_overridden\x18\x06 \x01(\bB\x03\xe0A\x03R\x0flimitOverridden:?\xeaA<\n" +
+	"\x1cmemos.api.v1/AttachmentQuota\x12\x1cusers/{user}/attachmentQuota\"\xd5\x01\n" +
+	"\x16AttachmentQuotaDetails\x12\x1d\n" +
+	"\n" +
+	"used_bytes\x18\x01 \x01(\x03R\tusedBytes\x12\x1f\n" +
+	"\vlimit_bytes\x18\x02 \x01(\x03R\n" +
+	"limitBytes\x12'\n" +
+	"\x0fremaining_bytes\x18\x03 \x01(\x03R\x0eremainingBytes\x12'\n" +
+	"\x0frequested_bytes\x18\x04 \x01(\x03R\x0erequestedBytes\x12)\n" +
+	"\x10limit_overridden\x18\x05 \x01(\bR\x0flimitOverridden\"U\n" +
+	"\x19GetAttachmentQuotaRequest\x128\n" +
+	"\x04name\x18\x01 \x01(\tB$\xe0A\x02\xfaA\x1e\n" +
+	"\x1cmemos.api.v1/AttachmentQuotaR\x04name\"c\n" +
+	"\x1bListAttachmentQuotasRequest\x12 \n" +
+	"\tpage_size\x18\x01 \x01(\x05B\x03\xe0A\x01R\bpageSize\x12\"\n" +
+	"\n" +
+	"page_token\x18\x02 \x01(\tB\x03\xe0A\x01R\tpageToken\"\x92\x01\n" +
+	"\x1cListAttachmentQuotasResponse\x12J\n" +
+	"\x11attachment_quotas\x18\x01 \x03(\v2\x1d.memos.api.v1.AttachmentQuotaR\x10attachmentQuotas\x12&\n" +
+	"\x0fnext_page_token\x18\x02 \x01(\tR\rnextPageToken\"\xaf\x01\n" +
+	"\x1cUpdateAttachmentQuotaRequest\x12M\n" +
+	"\x10attachment_quota\x18\x01 \x01(\v2\x1d.memos.api.v1.AttachmentQuotaB\x03\xe0A\x02R\x0fattachmentQuota\x12@\n" +
+	"\vupdate_mask\x18\x02 \x01(\v2\x1a.google.protobuf.FieldMaskB\x03\xe0A\x02R\n" +
+	"updateMask*h\n" +
 	"\x11MotionMediaFamily\x12#\n" +
 	"\x1fMOTION_MEDIA_FAMILY_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10APPLE_LIVE_PHOTO\x10\x01\x12\x18\n" +
@@ -1486,7 +1907,7 @@ const file_api_v1_attachment_service_proto_rawDesc = "" +
 	"\x1dMOTION_MEDIA_ROLE_UNSPECIFIED\x10\x00\x12\t\n" +
 	"\x05STILL\x10\x01\x12\t\n" +
 	"\x05VIDEO\x10\x02\x12\r\n" +
-	"\tCONTAINER\x10\x032\xdb\a\n" +
+	"\tCONTAINER\x10\x032\xda\v\n" +
 	"\x11AttachmentService\x12\x89\x01\n" +
 	"\x10CreateAttachment\x12%.memos.api.v1.CreateAttachmentRequest\x1a\x18.memos.api.v1.Attachment\"4\xdaA\n" +
 	"attachment\x82\xd3\xe4\x93\x02!:\n" +
@@ -1497,7 +1918,10 @@ const file_api_v1_attachment_service_proto_rawDesc = "" +
 	"\x10UpdateAttachment\x12%.memos.api.v1.UpdateAttachmentRequest\x1a\x18.memos.api.v1.Attachment\"T\xdaA\x16attachment,update_mask\x82\xd3\xe4\x93\x025:\n" +
 	"attachment2'/api/v1/{attachment.name=attachments/*}\x12~\n" +
 	"\x10DeleteAttachment\x12%.memos.api.v1.DeleteAttachmentRequest\x1a\x16.google.protobuf.Empty\"+\xdaA\x04name\x82\xd3\xe4\x93\x02\x1e*\x1c/api/v1/{name=attachments/*}\x12\x89\x01\n" +
-	"\x16BatchDeleteAttachments\x12+.memos.api.v1.BatchDeleteAttachmentsRequest\x1a\x16.google.protobuf.Empty\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/attachments:batchDeleteB\xae\x01\n" +
+	"\x16BatchDeleteAttachments\x12+.memos.api.v1.BatchDeleteAttachmentsRequest\x1a\x16.google.protobuf.Empty\"*\x82\xd3\xe4\x93\x02$:\x01*\"\x1f/api/v1/attachments:batchDelete\x12\x93\x01\n" +
+	"\x12GetAttachmentQuota\x12'.memos.api.v1.GetAttachmentQuotaRequest\x1a\x1d.memos.api.v1.AttachmentQuota\"5\xdaA\x04name\x82\xd3\xe4\x93\x02(\x12&/api/v1/{name=users/*/attachmentQuota}\x12\x8f\x01\n" +
+	"\x14ListAttachmentQuotas\x12).memos.api.v1.ListAttachmentQuotasRequest\x1a*.memos.api.v1.ListAttachmentQuotasResponse\" \x82\xd3\xe4\x93\x02\x1a\x12\x18/api/v1/attachmentQuotas\x12\xd4\x01\n" +
+	"\x15UpdateAttachmentQuota\x12*.memos.api.v1.UpdateAttachmentQuotaRequest\x1a\x1d.memos.api.v1.AttachmentQuota\"p\xdaA\x1cattachment_quota,update_mask\x82\xd3\xe4\x93\x02K:\x10attachment_quota27/api/v1/{attachment_quota.name=users/*/attachmentQuota}B\xae\x01\n" +
 	"\x10com.memos.api.v1B\x16AttachmentServiceProtoP\x01Z0github.com/usememos/memos/proto/gen/api/v1;apiv1\xa2\x02\x03MAX\xaa\x02\fMemos.Api.V1\xca\x02\fMemos\\Api\\V1\xe2\x02\x18Memos\\Api\\V1\\GPBMetadata\xea\x02\x0eMemos::Api::V1b\x06proto3"
 
 var (
@@ -1513,7 +1937,7 @@ func file_api_v1_attachment_service_proto_rawDescGZIP() []byte {
 }
 
 var file_api_v1_attachment_service_proto_enumTypes = make([]protoimpl.EnumInfo, 2)
-var file_api_v1_attachment_service_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
+var file_api_v1_attachment_service_proto_msgTypes = make([]protoimpl.MessageInfo, 23)
 var file_api_v1_attachment_service_proto_goTypes = []any{
 	(MotionMediaFamily)(0),                // 0: memos.api.v1.MotionMediaFamily
 	(MotionMediaRole)(0),                  // 1: memos.api.v1.MotionMediaRole
@@ -1534,9 +1958,15 @@ var file_api_v1_attachment_service_proto_goTypes = []any{
 	(*UpdateAttachmentRequest)(nil),       // 16: memos.api.v1.UpdateAttachmentRequest
 	(*DeleteAttachmentRequest)(nil),       // 17: memos.api.v1.DeleteAttachmentRequest
 	(*BatchDeleteAttachmentsRequest)(nil), // 18: memos.api.v1.BatchDeleteAttachmentsRequest
-	(*timestamppb.Timestamp)(nil),         // 19: google.protobuf.Timestamp
-	(*fieldmaskpb.FieldMask)(nil),         // 20: google.protobuf.FieldMask
-	(*emptypb.Empty)(nil),                 // 21: google.protobuf.Empty
+	(*AttachmentQuota)(nil),               // 19: memos.api.v1.AttachmentQuota
+	(*AttachmentQuotaDetails)(nil),        // 20: memos.api.v1.AttachmentQuotaDetails
+	(*GetAttachmentQuotaRequest)(nil),     // 21: memos.api.v1.GetAttachmentQuotaRequest
+	(*ListAttachmentQuotasRequest)(nil),   // 22: memos.api.v1.ListAttachmentQuotasRequest
+	(*ListAttachmentQuotasResponse)(nil),  // 23: memos.api.v1.ListAttachmentQuotasResponse
+	(*UpdateAttachmentQuotaRequest)(nil),  // 24: memos.api.v1.UpdateAttachmentQuotaRequest
+	(*timestamppb.Timestamp)(nil),         // 25: google.protobuf.Timestamp
+	(*fieldmaskpb.FieldMask)(nil),         // 26: google.protobuf.FieldMask
+	(*emptypb.Empty)(nil),                 // 27: google.protobuf.Empty
 }
 var file_api_v1_attachment_service_proto_depIdxs = []int32{
 	0,  // 0: memos.api.v1.MotionMedia.family:type_name -> memos.api.v1.MotionMediaFamily
@@ -1545,7 +1975,7 @@ var file_api_v1_attachment_service_proto_depIdxs = []int32{
 	7,  // 3: memos.api.v1.MediaMetadata.video:type_name -> memos.api.v1.VideoMetadata
 	5,  // 4: memos.api.v1.PhotoMetadata.capture_time:type_name -> memos.api.v1.MediaCaptureTime
 	6,  // 5: memos.api.v1.PhotoMetadata.location:type_name -> memos.api.v1.MediaLocation
-	19, // 6: memos.api.v1.Attachment.create_time:type_name -> google.protobuf.Timestamp
+	25, // 6: memos.api.v1.Attachment.create_time:type_name -> google.protobuf.Timestamp
 	2,  // 7: memos.api.v1.Attachment.motion_media:type_name -> memos.api.v1.MotionMedia
 	3,  // 8: memos.api.v1.Attachment.media_metadata:type_name -> memos.api.v1.MediaMetadata
 	8,  // 9: memos.api.v1.CreateAttachmentRequest.attachment:type_name -> memos.api.v1.Attachment
@@ -1554,26 +1984,35 @@ var file_api_v1_attachment_service_proto_depIdxs = []int32{
 	8,  // 12: memos.api.v1.UploadAttachmentResponse.attachment:type_name -> memos.api.v1.Attachment
 	8,  // 13: memos.api.v1.ListAttachmentsResponse.attachments:type_name -> memos.api.v1.Attachment
 	8,  // 14: memos.api.v1.UpdateAttachmentRequest.attachment:type_name -> memos.api.v1.Attachment
-	20, // 15: memos.api.v1.UpdateAttachmentRequest.update_mask:type_name -> google.protobuf.FieldMask
-	9,  // 16: memos.api.v1.AttachmentService.CreateAttachment:input_type -> memos.api.v1.CreateAttachmentRequest
-	10, // 17: memos.api.v1.AttachmentService.UploadAttachment:input_type -> memos.api.v1.UploadAttachmentRequest
-	13, // 18: memos.api.v1.AttachmentService.ListAttachments:input_type -> memos.api.v1.ListAttachmentsRequest
-	15, // 19: memos.api.v1.AttachmentService.GetAttachment:input_type -> memos.api.v1.GetAttachmentRequest
-	16, // 20: memos.api.v1.AttachmentService.UpdateAttachment:input_type -> memos.api.v1.UpdateAttachmentRequest
-	17, // 21: memos.api.v1.AttachmentService.DeleteAttachment:input_type -> memos.api.v1.DeleteAttachmentRequest
-	18, // 22: memos.api.v1.AttachmentService.BatchDeleteAttachments:input_type -> memos.api.v1.BatchDeleteAttachmentsRequest
-	8,  // 23: memos.api.v1.AttachmentService.CreateAttachment:output_type -> memos.api.v1.Attachment
-	12, // 24: memos.api.v1.AttachmentService.UploadAttachment:output_type -> memos.api.v1.UploadAttachmentResponse
-	14, // 25: memos.api.v1.AttachmentService.ListAttachments:output_type -> memos.api.v1.ListAttachmentsResponse
-	8,  // 26: memos.api.v1.AttachmentService.GetAttachment:output_type -> memos.api.v1.Attachment
-	8,  // 27: memos.api.v1.AttachmentService.UpdateAttachment:output_type -> memos.api.v1.Attachment
-	21, // 28: memos.api.v1.AttachmentService.DeleteAttachment:output_type -> google.protobuf.Empty
-	21, // 29: memos.api.v1.AttachmentService.BatchDeleteAttachments:output_type -> google.protobuf.Empty
-	23, // [23:30] is the sub-list for method output_type
-	16, // [16:23] is the sub-list for method input_type
-	16, // [16:16] is the sub-list for extension type_name
-	16, // [16:16] is the sub-list for extension extendee
-	0,  // [0:16] is the sub-list for field type_name
+	26, // 15: memos.api.v1.UpdateAttachmentRequest.update_mask:type_name -> google.protobuf.FieldMask
+	19, // 16: memos.api.v1.ListAttachmentQuotasResponse.attachment_quotas:type_name -> memos.api.v1.AttachmentQuota
+	19, // 17: memos.api.v1.UpdateAttachmentQuotaRequest.attachment_quota:type_name -> memos.api.v1.AttachmentQuota
+	26, // 18: memos.api.v1.UpdateAttachmentQuotaRequest.update_mask:type_name -> google.protobuf.FieldMask
+	9,  // 19: memos.api.v1.AttachmentService.CreateAttachment:input_type -> memos.api.v1.CreateAttachmentRequest
+	10, // 20: memos.api.v1.AttachmentService.UploadAttachment:input_type -> memos.api.v1.UploadAttachmentRequest
+	13, // 21: memos.api.v1.AttachmentService.ListAttachments:input_type -> memos.api.v1.ListAttachmentsRequest
+	15, // 22: memos.api.v1.AttachmentService.GetAttachment:input_type -> memos.api.v1.GetAttachmentRequest
+	16, // 23: memos.api.v1.AttachmentService.UpdateAttachment:input_type -> memos.api.v1.UpdateAttachmentRequest
+	17, // 24: memos.api.v1.AttachmentService.DeleteAttachment:input_type -> memos.api.v1.DeleteAttachmentRequest
+	18, // 25: memos.api.v1.AttachmentService.BatchDeleteAttachments:input_type -> memos.api.v1.BatchDeleteAttachmentsRequest
+	21, // 26: memos.api.v1.AttachmentService.GetAttachmentQuota:input_type -> memos.api.v1.GetAttachmentQuotaRequest
+	22, // 27: memos.api.v1.AttachmentService.ListAttachmentQuotas:input_type -> memos.api.v1.ListAttachmentQuotasRequest
+	24, // 28: memos.api.v1.AttachmentService.UpdateAttachmentQuota:input_type -> memos.api.v1.UpdateAttachmentQuotaRequest
+	8,  // 29: memos.api.v1.AttachmentService.CreateAttachment:output_type -> memos.api.v1.Attachment
+	12, // 30: memos.api.v1.AttachmentService.UploadAttachment:output_type -> memos.api.v1.UploadAttachmentResponse
+	14, // 31: memos.api.v1.AttachmentService.ListAttachments:output_type -> memos.api.v1.ListAttachmentsResponse
+	8,  // 32: memos.api.v1.AttachmentService.GetAttachment:output_type -> memos.api.v1.Attachment
+	8,  // 33: memos.api.v1.AttachmentService.UpdateAttachment:output_type -> memos.api.v1.Attachment
+	27, // 34: memos.api.v1.AttachmentService.DeleteAttachment:output_type -> google.protobuf.Empty
+	27, // 35: memos.api.v1.AttachmentService.BatchDeleteAttachments:output_type -> google.protobuf.Empty
+	19, // 36: memos.api.v1.AttachmentService.GetAttachmentQuota:output_type -> memos.api.v1.AttachmentQuota
+	23, // 37: memos.api.v1.AttachmentService.ListAttachmentQuotas:output_type -> memos.api.v1.ListAttachmentQuotasResponse
+	19, // 38: memos.api.v1.AttachmentService.UpdateAttachmentQuota:output_type -> memos.api.v1.AttachmentQuota
+	29, // [29:39] is the sub-list for method output_type
+	19, // [19:29] is the sub-list for method input_type
+	19, // [19:19] is the sub-list for extension type_name
+	19, // [19:19] is the sub-list for extension extendee
+	0,  // [0:19] is the sub-list for field type_name
 }
 
 func init() { file_api_v1_attachment_service_proto_init() }
@@ -1600,7 +2039,7 @@ func file_api_v1_attachment_service_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_api_v1_attachment_service_proto_rawDesc), len(file_api_v1_attachment_service_proto_rawDesc)),
 			NumEnums:      2,
-			NumMessages:   17,
+			NumMessages:   23,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

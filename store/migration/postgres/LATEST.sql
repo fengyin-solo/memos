@@ -95,6 +95,16 @@ CREATE TABLE attachment (
   payload TEXT NOT NULL DEFAULT '{}'
 );
 
+CREATE INDEX idx_attachment_creator_id ON attachment(creator_id);
+
+-- per-user attachment byte quota accounting
+-- limit_size -1 means the instance default quota applies; >= 0 is an override.
+CREATE TABLE user_attachment_quota (
+  user_id INTEGER PRIMARY KEY,
+  used_size BIGINT NOT NULL DEFAULT 0,
+  limit_size BIGINT NOT NULL DEFAULT -1
+);
+
 -- idp
 CREATE TABLE idp (
   id SERIAL PRIMARY KEY,

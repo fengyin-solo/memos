@@ -180,6 +180,14 @@ func (s *APIV1Service) CreateAttachment(ctx context.Context, request *v1pb.Creat
 		return nil, err
 	}
 	create.Size = int64(len(content))
+	quotaState, err := s.getAttachmentQuotaState(ctx, create.CreatorID)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkAttachmentQuotaBeforeWrite(quotaState, create.Size); err != nil {
+		return nil, err
+	}
+	create.QuotaLimitBytes = quotaState.limitForCreate()
 	return s.processAndSaveAttachment(ctx, create, instanceStorageSetting, bytes.NewReader(content))
 }
 
@@ -265,7 +273,7 @@ func (s *APIV1Service) processAndSaveAttachment(ctx context.Context, create *sto
 func (s *APIV1Service) persistAttachment(ctx context.Context, create *store.Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) (*v1pb.Attachment, error) {
 	attachment, err := s.Store.CreateAttachment(ctx, create)
 	if err != nil {
-		createErr := mapMemoWriteError(err, "failed to create attachment")
+		createErr := mapAttachmentQuotaCreateError(ctx, s, create.CreatorID, create.Size, err)
 		persistedObject, cleanupErr := cleanupSavedAttachmentBlob(ctx, s.Store, create, instanceStorageSetting)
 		if cleanupErr != nil {
 			slog.Error("failed to compensate attachment storage after database create failure",

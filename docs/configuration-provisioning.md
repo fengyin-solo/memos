@@ -233,7 +233,7 @@ Supported keys:
 | --- | --- |
 | `ACCESS` | Private or public instance access policy |
 | `GENERAL` | Registration, authentication, branding, scripts, styles, and user-profile policy |
-| `STORAGE` | Attachment storage type, limits, paths, and S3 credentials |
+| `STORAGE` | Attachment storage type, limits (including the per-user byte quota `attachmentQuotaLimitBytes`), paths, and S3 credentials |
 | `MEMO_RELATED` | Memo limits, editing behavior, and reactions |
 | `NOTIFICATION` | SMTP transport and credentials |
 | `AI` | AI providers, API keys, and transcription defaults |

@@ -15,22 +15,20 @@ import (
 )
 
 func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*store.Attachment, error) {
-	if create.Policy == nil {
-		id, err := insertMySQLAttachment(ctx, d.db, create)
-		if err != nil {
-			return nil, err
-		}
-		return d.GetAttachment(ctx, &store.FindAttachment{ID: &id})
-	}
-	if create.MemoID == nil || create.CreatorID != create.Policy.ActorUserID {
-		return nil, store.ErrMemoPermissionDenied
-	}
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := validateMySQLMemoWritePolicy(ctx, tx, *create.MemoID, create.Policy, nil); err != nil {
+	if create.Policy != nil {
+		if create.MemoID == nil || create.CreatorID != create.Policy.ActorUserID {
+			return nil, store.ErrMemoPermissionDenied
+		}
+		if _, err := validateMySQLMemoWritePolicy(ctx, tx, *create.MemoID, create.Policy, nil); err != nil {
+			return nil, err
+		}
+	}
+	if err := chargeMySQLAttachmentQuotaTx(ctx, tx, create.CreatorID, create.Size, create.QuotaLimitBytes); err != nil {
 		return nil, err
 	}
 	id, err := insertMySQLAttachment(ctx, tx, create)
@@ -313,6 +311,15 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 	}
 	defer func() { _ = tx.Rollback() }()
 
+	attachmentIDs := make([]int32, 0, len(deletes))
+	for _, delete := range deletes {
+		if delete != nil {
+			attachmentIDs = append(attachmentIDs, delete.ID)
+		}
+	}
+	if err := decrementMySQLAttachmentQuotaTx(ctx, tx, attachmentIDs); err != nil {
+		return err
+	}
 	stmt := "DELETE FROM `attachment` WHERE `id` = ?"
 	for _, delete := range deletes {
 		if delete == nil {

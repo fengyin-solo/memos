@@ -122,6 +122,10 @@ message InstanceStorageSetting {
   repeated Storage storages = 5;
   // default_storage_id identifies the storage used for new attachments.
   string default_storage_id = 6;
+  // attachment_quota_limit_bytes is the default per-user attachment quota in bytes.
+  // Zero (the default) disables per-user quota enforcement; a positive value is
+  // the byte limit applied to every user without an explicit per-user override.
+  int64 attachment_quota_limit_bytes = 7;
 }
 
 // Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/

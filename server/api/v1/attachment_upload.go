@@ -123,6 +123,15 @@ func (s *APIV1Service) startAttachmentUpload(ctx context.Context, request *v1pb.
 	if err := checkUploadSize(setting, spec.TotalSize); err != nil {
 		return "", nil, err
 	}
+	// Reject before any temporary byte is staged when the claimed total size
+	// would cross the user's effective quota.
+	quotaState, err := s.getAttachmentQuotaState(ctx, ownerID)
+	if err != nil {
+		return "", nil, err
+	}
+	if err := checkAttachmentQuotaBeforeWrite(quotaState, spec.TotalSize); err != nil {
+		return "", nil, err
+	}
 	// Validate before allocating a temporary file. Keep the original MIME type
 	// so an omitted type can be sniffed from real bytes at finalization.
 	metadata := proto.CloneOf(spec.Attachment)
@@ -161,6 +170,15 @@ func (s *APIV1Service) finishAttachmentUpload(ctx context.Context, upload *attac
 	if err := checkUploadSize(setting, upload.totalSize); err != nil {
 		return nil, err
 	}
+	// Friendly precheck before processing; the insert transaction remains the
+	// authoritative gate for concurrent writes.
+	quotaState, err := s.getAttachmentQuotaState(ctx, upload.ownerID)
+	if err != nil {
+		return nil, err
+	}
+	if err := checkAttachmentQuotaBeforeWrite(quotaState, upload.totalSize); err != nil {
+		return nil, err
+	}
 	file, err := os.Open(upload.path)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to open upload file: %v", err)
@@ -177,6 +195,7 @@ func (s *APIV1Service) finishAttachmentUpload(ctx context.Context, upload *attac
 		return nil, err
 	}
 	create.Size = upload.totalSize
+	create.QuotaLimitBytes = quotaState.limitForCreate()
 	upload.state.finalizeAttempted = true
 	return s.processAndSaveAttachment(ctx, create, setting, file)
 }

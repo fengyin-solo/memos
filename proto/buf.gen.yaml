@@ -14,7 +14,10 @@ plugins:
   - remote: buf.build/grpc/go
     out: gen
     opt: paths=source_relative
-  - remote: buf.build/connectrpc/go
+  # Pin the connect generator to v1: the unpinned BSR plugin now resolves to
+  # v2 (connectrpc.com/connect/v2), which is incompatible with this module.
+  # Install with: go install connectrpc.com/connect/cmd/protoc-gen-connect-go@v1.20.0
+  - local: protoc-gen-connect-go
     out: gen
     opt: paths=source_relative
   - remote: buf.build/grpc-ecosystem/gateway

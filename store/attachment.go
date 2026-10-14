@@ -38,6 +38,11 @@ type Attachment struct {
 	// Policy is present for transport-facing direct-link mutations. Drivers
 	// revalidate it in the same transaction as the attachment insert.
 	Policy *MemoWritePolicy
+	// QuotaLimitBytes is the creator's effective per-user attachment quota in
+	// bytes during creation. nil disables enforcement for this write; a
+	// non-nil limit is enforced atomically in the insert transaction (zero
+	// rejects every write). The usage counter is maintained either way.
+	QuotaLimitBytes *int64
 
 	// Composed field
 	MemoUID *string

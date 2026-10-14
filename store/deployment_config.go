@@ -242,6 +242,9 @@ func validateAndNormalizeDeploymentInstanceSetting(setting *storepb.InstanceSett
 		if storage.UploadSizeLimitMb < 0 {
 			return errors.New("storageSetting.uploadSizeLimitMb must not be negative")
 		}
+		if storage.AttachmentQuotaLimitBytes < 0 {
+			return errors.New("storageSetting.attachmentQuotaLimitBytes must not be negative")
+		}
 		defaultStorage := GetDefaultStorage(storage)
 		if defaultStorage != nil && defaultStorage.Type == storepb.StorageType_STORAGE_TYPE_S3 {
 			s3Config := defaultStorage.GetS3Config()

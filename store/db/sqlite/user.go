@@ -12,7 +12,18 @@ import (
 )
 
 func (d *DB) CreateUser(ctx context.Context, create *store.User) (*store.User, error) {
-	if err := insertUser(ctx, d.db, create); err != nil {
+	tx, err := d.db.BeginTx(ctx, nil)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	if err := insertUser(ctx, tx, create); err != nil {
+		return nil, err
+	}
+	if err := ensureSQLiteUserAttachmentQuotaRow(ctx, tx, create.ID); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
 		return nil, err
 	}
 	return create, nil

@@ -135,6 +135,9 @@ func deleteUserTargetsTx(ctx context.Context, tx *sql.Tx, userID int32, targets 
 	if err := deleteMemoRelationsTx(ctx, tx, memoIDs); err != nil {
 		return err
 	}
+	if _, err := tx.ExecContext(ctx, "DELETE FROM user_attachment_quota WHERE user_id = $1", userID); err != nil {
+		return err
+	}
 	if err := deleteUserRowTx(ctx, tx, userID); err != nil {
 		return err
 	}
@@ -299,6 +302,9 @@ func deleteReactionsByMemoIDsTx(ctx context.Context, tx *sql.Tx, memoIDs []int32
 }
 
 func deleteAttachmentsByIDsTx(ctx context.Context, tx *sql.Tx, attachmentIDs []int32) error {
+	if err := decrementPostgresAttachmentQuotaTx(ctx, tx, attachmentIDs); err != nil {
+		return err
+	}
 	for _, batch := range deleteUserBatches(attachmentIDs, deleteUserBatchSize) {
 		clause, args := deleteUserInClause(1, batch)
 		if _, err := tx.ExecContext(ctx, `DELETE FROM attachment WHERE id IN `+clause, args...); err != nil {

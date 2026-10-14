@@ -1,21 +1,25 @@
 import { create } from "@bufbuild/protobuf";
 import { FieldMaskSchema } from "@bufbuild/protobuf/wkt";
 import { sortBy } from "lodash-es";
-import { MoreVerticalIcon, PlusIcon } from "lucide-react";
+import { HardDriveIcon, MoreVerticalIcon, PlusIcon } from "lucide-react";
 import { useMemo, useState } from "react";
 import toast from "react-hot-toast";
+import AttachmentQuotaDialog from "@/components/Settings/AttachmentQuotaDialog";
 import ConfirmDialog from "@/components/ConfirmDialog";
 import InfoChip from "@/components/Settings/InfoChip";
 import UserAvatar from "@/components/UserAvatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { userServiceClient } from "@/connect";
+import { useAttachmentQuotaList } from "@/hooks/useAttachmentQuota";
 import useCurrentUser from "@/hooks/useCurrentUser";
 import { useDialog } from "@/hooks/useDialog";
 import { useDeleteUser, useListUsers } from "@/hooks/useUserQueries";
 import { handleError } from "@/lib/error";
+import type { AttachmentQuota } from "@/types/proto/api/v1/attachment_service_pb";
 import { State } from "@/types/proto/api/v1/common_pb";
 import { User, User_Role } from "@/types/proto/api/v1/user_service_pb";
+import { formatFileSize } from "@/utils/format";
 import { useTranslate } from "@/utils/i18n";
 import CreateUserDialog from "../CreateUserDialog";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
@@ -33,6 +37,15 @@ const MemberSection = () => {
   const sortedUsers = useMemo(() => sortBy(users, "id"), [users]);
   const [archiveTarget, setArchiveTarget] = useState<User | undefined>(undefined);
   const [deleteTarget, setDeleteTarget] = useState<User | undefined>(undefined);
+  const [quotaTarget, setQuotaTarget] = useState<{ user: User; quota?: AttachmentQuota } | undefined>(undefined);
+  const { data: attachmentQuotas = [] } = useAttachmentQuotaList();
+  const quotaByUserName = useMemo(() => {
+    const map = new Map<string, AttachmentQuota>();
+    for (const quota of attachmentQuotas) {
+      map.set(quota.name.replace(/\/attachmentQuota$/, ""), quota);
+    }
+    return map;
+  }, [attachmentQuotas]);
 
   const stringifyUserRole = (role: User_Role) => (role === User_Role.ADMIN ? t("setting.member.admin") : t("setting.member.user"));
 
@@ -162,6 +175,22 @@ const MemberSection = () => {
             ),
           },
           {
+            key: "storage",
+            header: t("setting.member.storage-column"),
+            render: (_, user: User) => {
+              const quota = quotaByUserName.get(user.name);
+              const limitLabel = quota?.enabled ? formatFileSize(Number(quota.limitBytes)) : t("setting.member.quota-unlimited");
+              return (
+                <div className="flex min-w-[12rem] items-center gap-2 whitespace-nowrap text-xs text-muted-foreground">
+                  <HardDriveIcon className="size-3.5 shrink-0" />
+                  <span>
+                    {quota ? formatFileSize(Number(quota.usedBytes)) : "0 B"} / {limitLabel}
+                  </span>
+                </div>
+              );
+            },
+          },
+          {
             key: "actions",
             header: "",
             className: "w-px text-right",
@@ -173,6 +202,11 @@ const MemberSection = () => {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end" sideOffset={2}>
                     <DropdownMenuItem onClick={() => handleEditUser(user)}>{t("common.update")}</DropdownMenuItem>
+                    <DropdownMenuItem
+                      onClick={() => setQuotaTarget({ user, quota: quotaByUserName.get(user.name) })}
+                    >
+                      {t("setting.member.edit-attachment-quota")}
+                    </DropdownMenuItem>
                     {user.state === State.NORMAL ? (
                       <DropdownMenuItem onClick={() => handleArchiveUserClick(user)}>{t("setting.member.archive-member")}</DropdownMenuItem>
                     ) : (
@@ -198,6 +232,13 @@ const MemberSection = () => {
 
       {/* Edit User Dialog */}
       <CreateUserDialog open={editDialog.isOpen} onOpenChange={editDialog.setOpen} user={editingUser} onSuccess={refetchUsers} />
+
+      <AttachmentQuotaDialog
+        open={!!quotaTarget}
+        onOpenChange={(open) => !open && setQuotaTarget(undefined)}
+        quota={quotaTarget?.quota}
+        username={quotaTarget?.user.username ?? ""}
+      />
 
       <ConfirmDialog
         open={!!archiveTarget}

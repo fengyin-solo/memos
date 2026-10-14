@@ -15,18 +15,20 @@ import (
 )
 
 func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*store.Attachment, error) {
-	if create.Policy == nil {
-		return insertSQLiteAttachment(ctx, d.db, create)
-	}
-	if create.MemoID == nil || create.CreatorID != create.Policy.ActorUserID {
-		return nil, store.ErrMemoPermissionDenied
-	}
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = tx.Rollback() }()
-	if _, err := validateSQLiteMemoWritePolicy(ctx, tx, *create.MemoID, create.Policy, nil); err != nil {
+	if create.Policy != nil {
+		if create.MemoID == nil || create.CreatorID != create.Policy.ActorUserID {
+			return nil, store.ErrMemoPermissionDenied
+		}
+		if _, err := validateSQLiteMemoWritePolicy(ctx, tx, *create.MemoID, create.Policy, nil); err != nil {
+			return nil, err
+		}
+	}
+	if err := chargeSQLiteAttachmentQuotaTx(ctx, tx, create.CreatorID, create.Size, create.QuotaLimitBytes); err != nil {
 		return nil, err
 	}
 	attachment, err := insertSQLiteAttachment(ctx, tx, create)
@@ -291,6 +293,13 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 		return errors.Wrap(err, "failed to start attachment delete transaction")
 	}
 	defer func() { _ = tx.Rollback() }()
+	attachmentIDs := make([]int32, 0, len(deletes))
+	for _, delete := range deletes {
+		attachmentIDs = append(attachmentIDs, delete.ID)
+	}
+	if err := decrementSQLiteAttachmentQuotaTx(ctx, tx, attachmentIDs); err != nil {
+		return err
+	}
 	stmt := "DELETE FROM `attachment` WHERE `id` = ?"
 	for _, delete := range deletes {
 		result, err := tx.ExecContext(ctx, stmt, delete.ID)

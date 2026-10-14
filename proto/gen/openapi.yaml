@@ -31,6 +31,39 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/attachmentQuotas:
+        get:
+            tags:
+                - AttachmentService
+            description: |-
+                ListAttachmentQuotas returns the attachment quota states of all users.
+                 Instance administrators only.
+            operationId: AttachmentService_ListAttachmentQuotas
+            parameters:
+                - name: pageSize
+                  in: query
+                  description: Optional. The maximum number of quotas to return.
+                  schema:
+                    type: integer
+                    format: int32
+                - name: pageToken
+                  in: query
+                  description: Optional. A page token from a previous call.
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ListAttachmentQuotasResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/attachments:
         get:
             tags:
@@ -2032,6 +2065,75 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/users/{user}/attachmentQuota:
+        get:
+            tags:
+                - AttachmentService
+            description: |-
+                GetAttachmentQuota returns the attachment byte quota state of one user.
+                 Users may read their own quota; instance administrators may read any user.
+            operationId: AttachmentService_GetAttachmentQuota
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AttachmentQuota'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
+        patch:
+            tags:
+                - AttachmentService
+            description: |-
+                UpdateAttachmentQuota sets or clears the per-user attachment quota
+                 override. Instance administrators only.
+            operationId: AttachmentService_UpdateAttachmentQuota
+            parameters:
+                - name: user
+                  in: path
+                  description: The user id.
+                  required: true
+                  schema:
+                    type: string
+                - name: updateMask
+                  in: query
+                  description: |-
+                    Required. Must contain "limit_bytes". limit_bytes of -1 clears the
+                     per-user override; non-negative values set it (zero blocks all uploads).
+                  schema:
+                    type: string
+                    format: field-mask
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/AttachmentQuota'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/AttachmentQuota'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/users/{user}/linkedIdentities:
         get:
             tags:
@@ -3066,6 +3168,44 @@ components:
                     allOf:
                         - $ref: '#/components/schemas/MediaMetadata'
                     description: Optional. Immutable normalized media metadata explicitly supplied by the client at creation time.
+        AttachmentQuota:
+            type: object
+            properties:
+                name:
+                    type: string
+                    description: 'The resource name. Format: users/{user}/attachmentQuota'
+                usedBytes:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Output only. Persisted attachment bytes owned by the user, summed across
+                         linked and unlinked attachments in every storage backend.
+                limitBytes:
+                    type: string
+                    description: |-
+                        The effective limit in bytes. A zero limit blocks every new upload.
+                         When enabled is false, quota enforcement is off and this field is -1.
+                         Input only on update: a value of -1 in update_mask clears the override
+                         and restores inheritance from the instance default.
+                remainingBytes:
+                    readOnly: true
+                    type: string
+                    description: |-
+                        Output only. Bytes still available, clamped at zero. -1 when the quota
+                         is disabled.
+                enabled:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        Output only. Whether a quota limit is currently enforced (the instance
+                         default is enabled or an explicit per-user override is set).
+                limitOverridden:
+                    readOnly: true
+                    type: boolean
+                    description: |-
+                        Output only. Whether limit_bytes comes from a per-user override instead
+                         of the instance default.
+            description: AttachmentQuota is the per-user attachment byte quota state.
         BatchDeleteAttachmentsRequest:
             required:
                 - names
@@ -3860,6 +4000,17 @@ components:
                     items:
                         $ref: '#/components/schemas/UserStats'
                     description: The list of user statistics.
+        ListAttachmentQuotasResponse:
+            type: object
+            properties:
+                attachmentQuotas:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/AttachmentQuota'
+                    description: The quota states, ordered by user id.
+                nextPageToken:
+                    type: string
+                    description: A token to retrieve the next page. Omitted when there are no more pages.
         ListAttachmentsResponse:
             type: object
             properties:
