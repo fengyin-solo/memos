@@ -2,6 +2,8 @@ package test
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"os"
 	"path/filepath"
 	"testing"
@@ -164,88 +166,90 @@ func TestCreateAttachmentCleansSavedBlobWhenStoreCreateFails(t *testing.T) {
 	})
 	require.NoError(t, err)
 
+	blobObjectPath := func(content []byte) string {
+		sum := sha256.Sum256(content)
+		sha := hex.EncodeToString(sum[:])
+		return filepath.Join(ts.Profile.Data, ".blobs", sha[:2], sha)
+	}
+	requireBlobCount := func(t *testing.T, expected int) {
+		t.Helper()
+		blobs, err := ts.Store.ListBlobs(ctx, &store.FindBlob{})
+		require.NoError(t, err)
+		require.Len(t, blobs, expected)
+	}
+
+	keptContent := []byte("kept")
 	const attachmentID = "attachment-create-failure"
 	_, err = ts.Service.CreateAttachment(userCtx, &v1pb.CreateAttachmentRequest{
 		AttachmentId: attachmentID,
 		Attachment: &v1pb.Attachment{
 			Filename: "kept.txt",
 			Type:     "text/plain",
-			Content:  []byte("kept"),
+			Content:  keptContent,
 		},
 	})
 	require.NoError(t, err)
-	keptPath := filepath.Join(ts.Profile.Data, "assets", "kept.txt")
-	require.FileExists(t, keptPath)
+	require.FileExists(t, blobObjectPath(keptContent))
+	requireBlobCount(t, 1)
 
+	// Reusing the attachment id fails the database transaction; the
+	// freshly materialized, unreferenced object is compensated away.
+	orphanContent := []byte("must be removed")
 	_, err = ts.Service.CreateAttachment(userCtx, &v1pb.CreateAttachmentRequest{
 		AttachmentId: attachmentID,
 		Attachment: &v1pb.Attachment{
 			Filename: "orphan.txt",
 			Type:     "text/plain",
-			Content:  []byte("must be removed"),
+			Content:  orphanContent,
 		},
 	})
 	require.Equal(t, codes.Internal, status.Code(err))
 	require.Contains(t, err.Error(), "failed to create attachment")
-	_, statErr := os.Stat(filepath.Join(ts.Profile.Data, "assets", "orphan.txt"))
-	require.ErrorIs(t, statErr, os.ErrNotExist)
-	kept, err := os.ReadFile(keptPath)
-	require.NoError(t, err)
-	require.Equal(t, []byte("kept"), kept)
+	require.NoFileExists(t, blobObjectPath(orphanContent))
+	require.FileExists(t, blobObjectPath(keptContent))
+	requireBlobCount(t, 1)
 
 	memo, err := ts.Service.CreateMemo(userCtx, &v1pb.CreateMemoRequest{Memo: &v1pb.Memo{Content: "attachment compensation policy"}})
 	require.NoError(t, err)
-	policyRejectionPath := filepath.Join(ts.Profile.Data, "assets", "policy-rejected.txt")
+	policyRejectedContent := []byte("policy rejected bytes")
 	_, err = ts.Service.CreateAttachment(store.WithCreateAttachmentPolicyFailpoint(userCtx), &v1pb.CreateAttachmentRequest{
 		AttachmentId: "attachment-policy-rejection",
 		Attachment: &v1pb.Attachment{
 			Filename: "policy-rejected.txt",
 			Type:     "text/plain",
-			Content:  []byte("must be removed"),
+			Content:  policyRejectedContent,
 			Memo:     &memo.Name,
 		},
 	})
 	require.Equal(t, codes.PermissionDenied, status.Code(err))
-	_, statErr = os.Stat(policyRejectionPath)
-	require.ErrorIs(t, statErr, os.ErrNotExist)
+	require.NoFileExists(t, blobObjectPath(policyRejectedContent))
 	policyRejectionUID := "attachment-policy-rejection"
 	persistedPolicyRejection, err := ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &policyRejectionUID})
 	require.NoError(t, err)
 	require.Nil(t, persistedPolicyRejection)
+	requireBlobCount(t, 1)
 
-	postCommitPath := filepath.Join(ts.Profile.Data, "assets", "post-commit.txt")
+	// The post-commit failpoint returns an error after the
+	// attachment and blob row committed: compensation must keep the
+	// shared object.
+	postCommitContent := []byte("must be preserved")
 	_, err = ts.Service.CreateAttachment(store.WithCreateAttachmentPostCommitFailpoint(userCtx), &v1pb.CreateAttachmentRequest{
 		AttachmentId: "attachment-post-commit",
 		Attachment: &v1pb.Attachment{
 			Filename: "post-commit.txt",
 			Type:     "text/plain",
-			Content:  []byte("must be preserved"),
+			Content:  postCommitContent,
 		},
 	})
 	require.Equal(t, codes.Internal, status.Code(err))
 	require.Contains(t, err.Error(), store.ErrCreateAttachmentPostCommitFailpoint.Error())
-	require.FileExists(t, postCommitPath, "a matching persisted row must suppress compensation")
+	require.FileExists(t, blobObjectPath(postCommitContent), "a committed blob row must suppress compensation")
 	postCommitUID := "attachment-post-commit"
 	persistedPostCommit, err := ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &postCommitUID})
 	require.NoError(t, err)
 	require.NotNil(t, persistedPostCommit)
-	require.Equal(t, postCommitPath, filepath.FromSlash(persistedPostCommit.Reference))
-
-	cleanupFailurePath := filepath.Join(ts.Profile.Data, "assets", "cleanup-failure.txt")
-	t.Cleanup(func() { _ = os.Remove(cleanupFailurePath) })
-	cleanupFailureCtx := store.WithDeleteAttachmentStorageFailpoint(store.WithCreateAttachmentPolicyFailpoint(userCtx))
-	_, err = ts.Service.CreateAttachment(cleanupFailureCtx, &v1pb.CreateAttachmentRequest{
-		AttachmentId: "attachment-cleanup-failure",
-		Attachment: &v1pb.Attachment{
-			Filename: "cleanup-failure.txt",
-			Type:     "text/plain",
-			Content:  []byte("cleanup failure"),
-			Memo:     &memo.Name,
-		},
-	})
-	require.Equal(t, codes.PermissionDenied, status.Code(err))
-	require.NotContains(t, err.Error(), store.ErrDeleteAttachmentStorageFailpoint.Error())
-	require.FileExists(t, cleanupFailurePath, "the failpoint must prove compensation was attempted")
+	require.NotNil(t, persistedPostCommit.BlobID)
+	requireBlobCount(t, 2)
 }
 
 func TestAttachmentMetadataFollowsMemoVisibility(t *testing.T) {
@@ -831,7 +835,7 @@ func TestBatchDeleteAttachments(t *testing.T) {
 	})
 }
 
-func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing.T) {
+func TestBatchDeleteAttachmentsDefersLegacyObjectCleanup(t *testing.T) {
 	ts := NewTestService(t)
 	defer ts.Cleanup()
 	ctx := context.Background()
@@ -865,8 +869,9 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 		path := filepath.Join(ts.Profile.Data, reference)
 		require.NoError(t, os.MkdirAll(filepath.Dir(path), 0o700))
 		require.NoError(t, os.WriteFile(path, []byte(attachment.Filename), 0o600))
+		// Simulate a legacy, not-yet-backfilled attachment.
 		_, err = ts.Store.GetDriver().GetDB().ExecContext(ctx,
-			"UPDATE attachment SET storage_type = ?, reference = ? WHERE id = ?",
+			"UPDATE attachment SET storage_type = ?, reference = ?, blob_id = NULL WHERE id = ?",
 			"LOCAL", reference, stored.ID,
 		)
 		require.NoError(t, err, "attachment %d", index)
@@ -874,10 +879,8 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 	}
 
 	names := []string{attachments[0].Name, attachments[1].Name}
-	_, err = ts.Service.BatchDeleteAttachments(store.WithDeleteAttachmentStorageFailpoint(userCtx), &v1pb.BatchDeleteAttachmentsRequest{Names: names})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "attachments were deleted but storage cleanup failed")
-	require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+	_, err = ts.Service.BatchDeleteAttachments(userCtx, &v1pb.BatchDeleteAttachmentsRequest{Names: names})
+	require.NoError(t, err)
 	for _, attachment := range attachments {
 		uid, err := apiv1.ExtractAttachmentUIDFromName(attachment.Name)
 		require.NoError(t, err)
@@ -888,10 +891,14 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 	listed, err := ts.Service.ListMemoAttachments(userCtx, &v1pb.ListMemoAttachmentsRequest{Name: memo.Name})
 	require.NoError(t, err)
 	require.Empty(t, listed.Attachments)
+	// The legacy objects survive deletion and become orphan candidates.
 	for _, path := range localPaths {
 		_, err := os.Stat(path)
-		require.NoError(t, err, "storage cleanup failure happens after the database deletion commits")
+		require.NoError(t, err, "legacy objects must wait for the blob garbage collector")
 	}
+	orphans, err := ts.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{})
+	require.NoError(t, err)
+	require.Len(t, orphans, len(localPaths))
 }
 
 func TestDeleteMotionMediaGroupRequiresWholeGroup(t *testing.T) {

@@ -122,6 +122,18 @@ message InstanceStorageSetting {
   repeated Storage storages = 5;
   // default_storage_id identifies the storage used for new attachments.
   string default_storage_id = 6;
+  // blob_grace_period_seconds is how long an unreferenced content-addressed blob is
+  // retained before physical deletion. 0 means the built-in default (7 days).
+  int64 blob_grace_period_seconds = 7;
+  // blob_gc_interval_seconds is the interval between automatic blob garbage
+  // collection runs. 0 means the built-in default (24 hours); a negative value
+  // disables the scheduled collector (the CLI command still works).
+  int64 blob_gc_interval_seconds = 8;
+  // blob_orphan_safety_age_seconds is the minimum age of an object with no blob
+  // record before the orphan sweep may delete it, so objects written by an upload
+  // whose database commit is still in flight are never reaped. 0 means the
+  // built-in default (1 hour).
+  int64 blob_orphan_safety_age_seconds = 9;
 }
 
 // Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/

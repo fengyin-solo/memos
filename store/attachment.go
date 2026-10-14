@@ -39,6 +39,15 @@ type Attachment struct {
 	// revalidate it in the same transaction as the attachment insert.
 	Policy *MemoWritePolicy
 
+	// BlobAcquire binds the new attachment to its content-addressed blob.
+	// The blob row is inserted/incremented in the same transaction as this row.
+	// Nil for legacy backfill-era rows and external attachments.
+	BlobAcquire *BlobAcquire
+	// BlobID points at the backing blob for content-addressed attachments.
+	BlobID *int64
+	// BlobBackfillStatus records legacy attachment backfill progress.
+	BlobBackfillStatus string
+
 	// Composed field
 	MemoUID *string
 }
@@ -46,6 +55,7 @@ type Attachment struct {
 type FindAttachment struct {
 	GetBlob        bool
 	ID             *int32
+	BlobID         *int64
 	UID            *string
 	CreatorID      *int32
 	Filename       *string
@@ -53,6 +63,9 @@ type FindAttachment struct {
 	MemoID         *int32
 	MemoIDList     []int32
 	HasRelatedMemo bool
+	// BackfillPending selects attachments without a blob row that have
+	// not been marked SKIPPED for the legacy attachment backfill.
+	BackfillPending bool
 	Filters        []string
 	// Access applies memo-local authorization to linked attachments
 	// before pagination. Unlinked attachments are visible only to the active
@@ -86,20 +99,14 @@ const (
 	motionCacheFolder    = ".motion_cache"
 )
 
-type deleteAttachmentStorageFailpointKey struct{}
 type createAttachmentPolicyFailpointKey struct{}
 type createAttachmentPostCommitFailpointKey struct{}
 
-// ErrDeleteAttachmentStorageFailpoint is returned by the test-only attachment storage failpoint.
-var ErrDeleteAttachmentStorageFailpoint = errors.New("delete attachment storage failpoint")
+// ErrCreateAttachmentPolicyFailpoint is returned when the policy failpoint triggers.
+var ErrCreateAttachmentPolicyFailpoint = errors.New("memo write policy failpoint")
 
 // ErrCreateAttachmentPostCommitFailpoint is returned after the test-only attachment create failpoint persists a row.
 var ErrCreateAttachmentPostCommitFailpoint = errors.New("create attachment post-commit failpoint")
-
-// WithDeleteAttachmentStorageFailpoint forces DeleteAttachmentStorage to return a failpoint error.
-func WithDeleteAttachmentStorageFailpoint(ctx context.Context) context.Context {
-	return context.WithValue(ctx, deleteAttachmentStorageFailpointKey{}, true)
-}
 
 // WithCreateAttachmentPolicyFailpoint forces a policy-bearing attachment create to fail before its database insert.
 func WithCreateAttachmentPolicyFailpoint(ctx context.Context) context.Context {
@@ -266,63 +273,11 @@ func (s *Store) deleteAttachmentStorageImpl(ctx context.Context, attachment *Att
 	if attachment == nil {
 		return nil
 	}
-	if shouldFailDeleteAttachmentStorage(ctx) {
-		return ErrDeleteAttachmentStorageFailpoint
-	}
-
-	if attachment.StorageType == storepb.AttachmentStorageType_LOCAL {
-		if err := func() error {
-			p := filepath.FromSlash(attachment.Reference)
-			if !filepath.IsAbs(p) {
-				p = filepath.Join(s.profile.Data, p)
-			}
-			err := os.Remove(p)
-			if err != nil && !os.IsNotExist(err) {
-				return errors.Wrap(err, "failed to delete local file")
-			}
-			return nil
-		}(); err != nil {
-			return err
-		}
-	} else if attachment.StorageType == storepb.AttachmentStorageType_S3 {
-		if err := func() error {
-			s3ObjectPayload := attachment.Payload.GetS3Object()
-			if s3ObjectPayload == nil {
-				return errors.Errorf("No s3 object found")
-			}
-			// Deletes resolve with the registry like reads do, so a legacy
-			// attachment picks up rotated credentials for its namespace instead
-			// of deleting with the stale embedded config.
-			if instanceStorageSetting == nil {
-				var err error
-				instanceStorageSetting, err = s.GetInstanceStorageSetting(ctx)
-				if err != nil {
-					if AttachmentNeedsInstanceStorageSetting(attachment) {
-						return errors.Wrap(err, "failed to get instance storage setting")
-					}
-					// The embedded config is sufficient on its own; keep the
-					// delete best-effort when the settings read fails.
-					instanceStorageSetting = nil
-				}
-			}
-
-			resolvedStorage, err := ResolveStorage(instanceStorageSetting, s3ObjectPayload.StorageId, s3ObjectPayload.S3Config)
-			if err != nil {
-				return errors.Wrap(err, "failed to resolve storage")
-			}
-			driver, err := s.StorageDriver(ctx, resolvedStorage)
-			if err != nil {
-				return errors.Wrap(err, "failed to create storage driver")
-			}
-			if err := driver.DeleteObject(ctx, s3ObjectPayload.Key); err != nil {
-				return errors.Wrap(err, "Failed to delete s3 object")
-			}
-			return nil
-		}(); err != nil {
-			return err
-		}
-	}
-
+	// Content-addressed blob are reference counted: the attachment delete
+	// transaction already decremented the count (or registered the object of
+	// a legacy, not-yet-backfilled attachment as an orphan). The physical
+	// object is reclaimed later by the blob garbage collector after the
+	// grace period. Only derived per-attachment caches are safe to remove now.
 	s.deleteAttachmentDerivedCaches(attachment)
 	return nil
 }
@@ -396,11 +351,6 @@ func (s *Store) deleteAttachmentDerivedCaches(attachment *Attachment) {
 			slog.Warn("Failed to delete derived attachment cache", slog.String("path", cachePath), slog.Any("err", err))
 		}
 	}
-}
-
-func shouldFailDeleteAttachmentStorage(ctx context.Context) bool {
-	failpoint, ok := ctx.Value(deleteAttachmentStorageFailpointKey{}).(bool)
-	return ok && failpoint
 }
 
 func shouldFailCreateAttachmentPolicy(ctx context.Context) bool {

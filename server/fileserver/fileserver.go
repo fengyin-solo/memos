@@ -245,18 +245,19 @@ func (s *FileServerService) serveMediaStream(c *echo.Context, attachment *store.
 	setSecurityHeaders(c)
 	setMediaHeaders(c, contentType, attachment.Type)
 
-	switch attachment.StorageType {
-	case storepb.AttachmentStorageType_LOCAL:
-		http.ServeFile(c.Response(), c.Request(), s.resolveLocalPath(attachment.Reference))
+	object, err := s.resolveAttachmentObject(c.Request().Context(), attachment)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve attachment").Wrap(err)
+	}
+	switch object.kind() {
+	case "local":
+		http.ServeFile(c.Response(), c.Request(), object.localPath)
 		return nil
-
-	case storepb.AttachmentStorageType_S3:
-		return s.streamS3Object(c, attachment, contentType)
-
+	case "s3":
+		return s.streamResolvedS3Object(c, object, contentType)
 	default:
-		// Database storage fallback.
 		modTime := time.Unix(attachment.UpdatedTs, 0)
-		http.ServeContent(c.Response(), c.Request(), attachment.Filename, modTime, bytes.NewReader(attachment.Blob))
+		http.ServeContent(c.Response(), c.Request(), attachment.Filename, modTime, bytes.NewReader(object.content))
 		return nil
 	}
 }
@@ -284,20 +285,83 @@ func (s *FileServerService) serveStaticFile(c *echo.Context, attachment *store.A
 		c.Response().Header().Set(echo.HeaderContentDisposition, fmt.Sprintf("attachment; filename=%q", attachment.Filename))
 	}
 
-	switch attachment.StorageType {
-	case storepb.AttachmentStorageType_LOCAL:
-		http.ServeFile(c.Response(), c.Request(), s.resolveLocalPath(attachment.Reference))
+	object, err := s.resolveAttachmentObject(c.Request().Context(), attachment)
+	if err != nil {
+		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve attachment").Wrap(err)
+	}
+	switch object.kind() {
+	case "local":
+		http.ServeFile(c.Response(), c.Request(), object.localPath)
 		return nil
-	case storepb.AttachmentStorageType_S3:
-		return s.streamS3Object(c, attachment, contentType)
+	case "s3":
+		return s.streamResolvedS3Object(c, object, contentType)
 	default:
-		return c.Blob(http.StatusOK, contentType, attachment.Blob)
+		return c.Blob(http.StatusOK, contentType, object.content)
 	}
 }
 
 // =============================================================================
 // Storage Operations
 // =============================================================================
+
+// resolvedAttachmentObject is the physical backing of an attachment:
+// a local path, an S3 driver+key, or inline DATABASE bytes.
+type resolvedAttachmentObject struct {
+	localPath string
+	s3Driver  storage.Driver
+	s3Key    string
+	content  []byte
+}
+
+func (o *resolvedAttachmentObject) kind() string {
+	switch {
+	case o.localPath != "":
+		return "local"
+	case o.s3Driver != nil:
+		return "s3"
+	default:
+		return "database"
+	}
+}
+
+// resolveAttachmentObject resolves the physical object of an attachment.
+// Content-addressed attachments read the blob row; legacy attachments
+// keep using reference/payload/inline bytes.
+func (s *FileServerService) resolveAttachmentObject(ctx context.Context, attachment *store.Attachment) (*resolvedAttachmentObject, error) {
+	if attachment.BlobID != nil {
+		blob, err := s.Store.GetAttachmentBlob(ctx, attachment)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load attachment blob")
+		}
+		if blob == nil {
+			return nil, errors.New("attachment blob not found")
+		}
+		switch blob.StorageID {
+		case store.BlobStorageLocalID:
+			return &resolvedAttachmentObject{localPath: s.resolveLocalPath(blob.Location)}, nil
+		case store.BlobStorageDatabaseID:
+			return &resolvedAttachmentObject{content: blob.Content}, nil
+		default:
+			driver, err := s.Store.StorageDriverByID(ctx, blob.StorageID)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to resolve blob storage driver")
+			}
+			return &resolvedAttachmentObject{s3Driver: driver, s3Key: blob.Location}, nil
+		}
+	}
+	switch attachment.StorageType {
+	case storepb.AttachmentStorageType_LOCAL:
+		return &resolvedAttachmentObject{localPath: s.resolveLocalPath(attachment.Reference)}, nil
+	case storepb.AttachmentStorageType_S3:
+		driver, s3Object, err := s.Store.ResolveAttachmentS3Driver(ctx, attachment)
+		if err != nil {
+			return nil, err
+		}
+		return &resolvedAttachmentObject{s3Driver: driver, s3Key: s3Object.Key}, nil
+	default:
+		return &resolvedAttachmentObject{content: attachment.Blob}, nil
+	}
+}
 
 // getAttachmentBlob retrieves the binary content of an attachment from storage.
 func (s *FileServerService) getAttachmentBlob(ctx context.Context, attachment *store.Attachment) ([]byte, error) {
@@ -316,9 +380,13 @@ func (s *FileServerService) getAttachmentBlob(ctx context.Context, attachment *s
 
 // getAttachmentReader returns a reader for streaming attachment content.
 func (s *FileServerService) getAttachmentReader(ctx context.Context, attachment *store.Attachment) (io.ReadCloser, error) {
-	switch attachment.StorageType {
-	case storepb.AttachmentStorageType_LOCAL:
-		file, err := os.Open(s.resolveLocalPath(attachment.Reference))
+	object, err := s.resolveAttachmentObject(ctx, attachment)
+	if err != nil {
+		return nil, err
+	}
+	switch object.kind() {
+	case "local":
+		file, err := os.Open(object.localPath)
 		if err != nil {
 			if os.IsNotExist(err) {
 				return nil, errors.Wrap(err, "file not found")
@@ -326,20 +394,14 @@ func (s *FileServerService) getAttachmentReader(ctx context.Context, attachment 
 			return nil, errors.Wrap(err, "failed to open file")
 		}
 		return file, nil
-
-	case storepb.AttachmentStorageType_S3:
-		driver, s3Object, err := s.Store.ResolveAttachmentS3Driver(ctx, attachment)
-		if err != nil {
-			return nil, err
-		}
-		object, err := driver.GetObjectStream(ctx, s3Object.Key, "")
+	case "s3":
+		stream, err := object.s3Driver.GetObjectStream(ctx, object.s3Key, "")
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to stream from S3")
 		}
-		return object.Body, nil
-
+		return stream.Body, nil
 	default:
-		return io.NopCloser(bytes.NewReader(attachment.Blob)), nil
+		return io.NopCloser(bytes.NewReader(object.content)), nil
 	}
 }
 
@@ -356,14 +418,10 @@ func (s *FileServerService) resolveLocalPath(reference string) string {
 // single Range so media players and document viewers can seek without a direct
 // S3 URL. Multipart ranges are ignored and served as a complete response
 // because S3 does not support multipart range responses.
-func (s *FileServerService) streamS3Object(c *echo.Context, attachment *store.Attachment, contentType string) error {
+func (s *FileServerService) streamResolvedS3Object(c *echo.Context, object *resolvedAttachmentObject, contentType string) error {
 	ctx := c.Request().Context()
-	driver, s3Object, err := s.Store.ResolveAttachmentS3Driver(ctx, attachment)
-	if err != nil {
-		return echo.NewHTTPError(http.StatusInternalServerError, "failed to resolve S3 attachment driver").Wrap(err)
-	}
 
-	object, err := driver.GetObjectStream(ctx, s3Object.Key, singleRangeHeader(c.Request().Header))
+	stream, err := object.s3Driver.GetObjectStream(ctx, object.s3Key, singleRangeHeader(c.Request().Header))
 	if err != nil {
 		if errors.Is(err, storage.ErrRangeNotSatisfiable) {
 			h := c.Response().Header()
@@ -376,19 +434,19 @@ func (s *FileServerService) streamS3Object(c *echo.Context, attachment *store.At
 		}
 		return echo.NewHTTPError(http.StatusInternalServerError, "failed to stream from S3").Wrap(err)
 	}
-	defer object.Body.Close()
+	defer stream.Body.Close()
 
 	h := c.Response().Header()
 	h.Set("Accept-Ranges", "bytes")
-	if object.ContentLength >= 0 {
-		h.Set(echo.HeaderContentLength, strconv.FormatInt(object.ContentLength, 10))
+	if stream.ContentLength >= 0 {
+		h.Set(echo.HeaderContentLength, strconv.FormatInt(stream.ContentLength, 10))
 	}
 	status := http.StatusOK
-	if object.ContentRange != "" {
-		h.Set("Content-Range", object.ContentRange)
+	if stream.ContentRange != "" {
+		h.Set("Content-Range", stream.ContentRange)
 		status = http.StatusPartialContent
 	}
-	return c.Stream(status, contentType, object.Body)
+	return c.Stream(status, contentType, stream.Body)
 }
 
 // singleRangeHeader returns a Range value only when it contains one range.

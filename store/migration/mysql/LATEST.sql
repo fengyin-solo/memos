@@ -92,7 +92,53 @@ CREATE TABLE `attachment` (
   `memo_id` INT DEFAULT NULL,
   `storage_type` VARCHAR(256) NOT NULL DEFAULT '',
   `reference` TEXT NOT NULL DEFAULT (''),
-  `payload` TEXT NOT NULL
+  `payload` TEXT NOT NULL,
+  `blob_id` INT DEFAULT NULL,
+  `blob_backfill_status` VARCHAR(32) NOT NULL DEFAULT ''
+);
+
+CREATE INDEX `idx_attachment_blob_id` ON `attachment`(`blob_id`);
+
+-- blob
+CREATE TABLE `blob` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `storage_id` VARCHAR(256) NOT NULL,
+  `sha256` CHAR(64) NOT NULL,
+  `size` BIGINT NOT NULL DEFAULT 0,
+  `reference_count` INT NOT NULL DEFAULT 0,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'ACTIVE',
+  `content` MEDIUMBLOB DEFAULT NULL,
+  `location` TEXT NOT NULL,
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `orphaned_ts` BIGINT DEFAULT NULL,
+  UNIQUE (`storage_id`, `sha256`),
+  KEY `idx_blob_status_orphaned` (`status`, `orphaned_ts`)
+);
+
+CREATE TABLE `blob_event` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `blob_id` INT DEFAULT NULL,
+  `storage_id` VARCHAR(256) NOT NULL DEFAULT '',
+  `sha256` CHAR(64) NOT NULL DEFAULT '',
+  `type` VARCHAR(64) NOT NULL,
+  `detail` TEXT NOT NULL,
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  KEY `idx_blob_event_blob_id` (`blob_id`),
+  KEY `idx_blob_event_type_created` (`type`, `created_ts`)
+);
+
+CREATE TABLE `blob_orphan` (
+  `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `storage_id` VARCHAR(256) NOT NULL DEFAULT '',
+  `storage_type` VARCHAR(32) NOT NULL DEFAULT '',
+  `location` TEXT NOT NULL,
+  `payload` TEXT NOT NULL,
+  `reason` VARCHAR(64) NOT NULL,
+  `status` VARCHAR(32) NOT NULL DEFAULT 'PENDING',
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  KEY `idx_blob_orphan_status_created` (`status`, `created_ts`)
 );
 
 -- idp

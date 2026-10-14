@@ -256,25 +256,28 @@ func TestMemoManagedAttachmentImages(t *testing.T) {
 		localPath := filepath.Join(ts.Profile.Data, localReference)
 		require.NoError(t, os.WriteFile(localPath, []byte("local image"), 0o600))
 		_, err = ts.Store.GetDriver().GetDB().ExecContext(ctx,
-			"UPDATE attachment SET storage_type = ?, reference = ? WHERE id = ?",
+			"UPDATE attachment SET storage_type = ?, reference = ?, blob_id = NULL WHERE id = ?",
 			"LOCAL", localReference, storedImage.ID,
 		)
 		require.NoError(t, err)
-		_, err = ts.Service.UpdateMemo(store.WithDeleteAttachmentStorageFailpoint(userCtx), &v1pb.UpdateMemoRequest{
+		_, err = ts.Service.UpdateMemo(userCtx, &v1pb.UpdateMemoRequest{
 			Memo:       &v1pb.Memo{Name: memo.Name, Content: "attachment removed", Attachments: []*v1pb.Attachment{}},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"content", "attachments"}},
 		})
-		require.Equal(t, codes.Internal, status.Code(err))
-		require.ErrorContains(t, err, "memo was updated but attachment storage cleanup failed")
-		require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+		require.NoError(t, err)
 		storedMemo, getErr := ts.Service.GetMemo(userCtx, &v1pb.GetMemoRequest{Name: memo.Name})
 		require.NoError(t, getErr)
 		require.Equal(t, "attachment removed", storedMemo.Content)
 		storedImage, getErr = ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &uid})
 		require.NoError(t, getErr)
 		require.Nil(t, storedImage)
+		// Legacy object deletion is deferred to the blob GC; it is
+		// registered as an orphan candidate.
 		_, statErr := os.Stat(localPath)
 		require.NoError(t, statErr)
+		orphans, err := ts.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{})
+		require.NoError(t, err)
+		require.NotEmpty(t, orphans)
 	})
 
 	t.Run("failed content validation does not mutate the memo", func(t *testing.T) {

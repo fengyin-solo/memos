@@ -264,6 +264,19 @@ func (s *Store) ResolveStorageDriver(
 	return s.StorageDriver(ctx, resolvedStorage)
 }
 
+// StorageDriverByID resolves the driver for a configured storage id.
+func (s *Store) StorageDriverByID(ctx context.Context, storageID string) (storage.Driver, error) {
+	setting, err := s.GetInstanceStorageSetting(ctx)
+	if err != nil {
+		return nil, err
+	}
+	resolvedStorage := FindStorage(setting, storageID)
+	if resolvedStorage == nil {
+		return nil, errors.Errorf("storage %q is not configured", storageID)
+	}
+	return s.StorageDriver(ctx, resolvedStorage)
+}
+
 // StorageDriver returns the driver for a resolved storage, reusing cached
 // clients so request paths do not rebuild an S3 client (config load, HTTP
 // transport) per call. ID-less legacy storages are not cached.

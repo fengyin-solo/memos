@@ -825,8 +825,20 @@ type InstanceStorageSetting struct {
 	Storages []*Storage `protobuf:"bytes,5,rep,name=storages,proto3" json:"storages,omitempty"`
 	// default_storage_id identifies the storage used for new attachments.
 	DefaultStorageId string `protobuf:"bytes,6,opt,name=default_storage_id,json=defaultStorageId,proto3" json:"default_storage_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// blob_grace_period_seconds is how long an unreferenced content-addressed blob is
+	// retained before physical deletion. 0 means the built-in default (7 days).
+	BlobGracePeriodSeconds int64 `protobuf:"varint,7,opt,name=blob_grace_period_seconds,json=blobGracePeriodSeconds,proto3" json:"blob_grace_period_seconds,omitempty"`
+	// blob_gc_interval_seconds is the interval between automatic blob garbage
+	// collection runs. 0 means the built-in default (24 hours); a negative value
+	// disables the scheduled collector (the CLI command still works).
+	BlobGcIntervalSeconds int64 `protobuf:"varint,8,opt,name=blob_gc_interval_seconds,json=blobGcIntervalSeconds,proto3" json:"blob_gc_interval_seconds,omitempty"`
+	// blob_orphan_safety_age_seconds is the minimum age of an object with no blob
+	// record before the orphan sweep may delete it, so objects written by an upload
+	// whose database commit is still in flight are never reaped. 0 means the
+	// built-in default (1 hour).
+	BlobOrphanSafetyAgeSeconds int64 `protobuf:"varint,9,opt,name=blob_orphan_safety_age_seconds,json=blobOrphanSafetyAgeSeconds,proto3" json:"blob_orphan_safety_age_seconds,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *InstanceStorageSetting) Reset() {
@@ -899,6 +911,27 @@ func (x *InstanceStorageSetting) GetDefaultStorageId() string {
 		return x.DefaultStorageId
 	}
 	return ""
+}
+
+func (x *InstanceStorageSetting) GetBlobGracePeriodSeconds() int64 {
+	if x != nil {
+		return x.BlobGracePeriodSeconds
+	}
+	return 0
+}
+
+func (x *InstanceStorageSetting) GetBlobGcIntervalSeconds() int64 {
+	if x != nil {
+		return x.BlobGcIntervalSeconds
+	}
+	return 0
+}
+
+func (x *InstanceStorageSetting) GetBlobOrphanSafetyAgeSeconds() int64 {
+	if x != nil {
+		return x.BlobOrphanSafetyAgeSeconds
+	}
+	return 0
 }
 
 // Reference: https://developers.cloudflare.com/r2/examples/aws/aws-sdk-go/
@@ -1353,7 +1386,6 @@ type TranscriptionConfig struct {
 	//   - whisper-1 (legacy, lower cost)
 	//   - gpt-4o-transcribe, gpt-4o-mini-transcribe (higher quality)
 	//   - gpt-4o-transcribe-diarize (includes speaker labels)
-	//
 	// GEMINI examples:
 	//   - gemini-2.5-flash (default, multimodal call)
 	//   - gemini-2.5-pro
@@ -1628,14 +1660,17 @@ const file_store_instance_setting_proto_rawDesc = "" +
 	"\x04type\x18\x03 \x01(\x0e2\x18.memos.store.StorageTypeR\x04type\x12;\n" +
 	"\ts3_config\x18\n" +
 	" \x01(\v2\x1c.memos.store.StorageS3ConfigH\x00R\bs3ConfigB\b\n" +
-	"\x06config\"\xb3\x03\n" +
+	"\x06config\"\xeb\x04\n" +
 	"\x16InstanceStorageSetting\x12R\n" +
 	"\fstorage_type\x18\x01 \x01(\x0e2/.memos.store.InstanceStorageSetting.StorageTypeR\vstorageType\x12+\n" +
 	"\x11filepath_template\x18\x02 \x01(\tR\x10filepathTemplate\x12/\n" +
 	"\x14upload_size_limit_mb\x18\x03 \x01(\x03R\x11uploadSizeLimitMb\x129\n" +
 	"\ts3_config\x18\x04 \x01(\v2\x1c.memos.store.StorageS3ConfigR\bs3Config\x120\n" +
 	"\bstorages\x18\x05 \x03(\v2\x14.memos.store.StorageR\bstorages\x12,\n" +
-	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\"L\n" +
+	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\x129\n" +
+	"\x19blob_grace_period_seconds\x18\a \x01(\x03R\x16blobGracePeriodSeconds\x127\n" +
+	"\x18blob_gc_interval_seconds\x18\b \x01(\x03R\x15blobGcIntervalSeconds\x12B\n" +
+	"\x1eblob_orphan_safety_age_seconds\x18\t \x01(\x03R\x1ablobOrphanSafetyAgeSeconds\"L\n" +
 	"\vStorageType\x12\x1c\n" +
 	"\x18STORAGE_TYPE_UNSPECIFIED\x10\x00\x12\f\n" +
 	"\bDATABASE\x10\x01\x12\t\n" +

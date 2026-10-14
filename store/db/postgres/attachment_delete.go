@@ -37,6 +37,9 @@ func (d *DB) DeleteAttachmentsWithPolicy(ctx context.Context, policy *store.Atta
 	if err := authorizePostgresAttachmentMutation(ctx, tx, policy.ActorUserID, actor.Admin, memoIDs, policy.ExpectedMemoContents); err != nil {
 		return err
 	}
+	if err := releasePostgresAttachments(ctx, tx, attachments); err != nil {
+		return err
+	}
 
 	for _, attachmentID := range attachmentIDs {
 		result, err := tx.ExecContext(ctx, "DELETE FROM attachment WHERE id = $1", attachmentID)
@@ -60,7 +63,7 @@ func listPostgresAttachmentSnapshots(ctx context.Context, tx *sql.Tx, attachment
 	seen := make(map[int32]struct{}, len(attachmentIDs))
 	for _, batch := range deleteUserBatches(attachmentIDs, deleteUserBatchSize) {
 		clause, args := deleteUserInClause(1, batch)
-		if err := appendDeleteUserAttachments(ctx, tx, `SELECT id, uid, creator_id, memo_id, storage_type, reference, payload
+		if err := appendDeleteUserAttachments(ctx, tx, `SELECT id, uid, creator_id, memo_id, storage_type, reference, payload, blob_id
 			FROM attachment WHERE id IN `+clause+` ORDER BY id`, args, seen, &attachments); err != nil {
 			return nil, err
 		}

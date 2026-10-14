@@ -311,6 +311,7 @@ func TestMigrationSpaceMemberStatusBackfillsActive(t *testing.T) {
 	require.NoError(t, err)
 	_, err = db.ExecContext(ctx, "ALTER TABLE space DROP COLUMN payload")
 	require.NoError(t, err)
+	dropBlobSchema032(ctx, t, db)
 
 	basicSetting, err := ts.GetInstanceBasicSetting(ctx)
 	require.NoError(t, err)
@@ -1089,6 +1090,31 @@ func skipWithoutLegacySchema(t *testing.T, driver string) {
 	t.Helper()
 	if driver == "d1" {
 		t.Skip("D1 databases start at the current schema; there is no legacy schema to migrate")
+	}
+}
+
+// dropBlobSchema032 removes the objects introduced by the 0.32 blob migration.
+// Replay tests initialize a current LATEST schema, roll the recorded version
+// back, and re-run incremental migrations; the blob objects must be removed
+// first so the replayed CREATE/ALTER statements succeed.
+func dropBlobSchema032(ctx context.Context, t *testing.T, db *sql.DB) {
+	t.Helper()
+	blobTable := "blob"
+	dropIndex := "DROP INDEX idx_attachment_blob_id"
+	if getDriverFromEnv() == "mysql" {
+		blobTable = "`blob`"
+		dropIndex = "ALTER TABLE attachment DROP INDEX idx_attachment_blob_id"
+	}
+	for _, stmt := range []string{
+		"DROP TABLE blob_event",
+		"DROP TABLE blob_orphan",
+		"DROP TABLE " + blobTable,
+		dropIndex,
+		"ALTER TABLE attachment DROP COLUMN blob_id",
+		"ALTER TABLE attachment DROP COLUMN blob_backfill_status",
+	} {
+		_, err := db.ExecContext(ctx, stmt)
+		require.NoError(t, err)
 	}
 }
 

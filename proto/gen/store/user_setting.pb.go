@@ -1189,18 +1189,18 @@ func file_store_user_setting_proto_rawDescGZIP() []byte {
 var file_store_user_setting_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
 var file_store_user_setting_proto_msgTypes = make([]protoimpl.MessageInfo, 15)
 var file_store_user_setting_proto_goTypes = []any{
-	(UserSetting_Key)(0),                          // 0: memos.store.UserSetting.Key
-	(*UserSetting)(nil),                           // 1: memos.store.UserSetting
-	(*GeneralUserSetting)(nil),                    // 2: memos.store.GeneralUserSetting
-	(*UserTagMetadata)(nil),                       // 3: memos.store.UserTagMetadata
-	(*TagsUserSetting)(nil),                       // 4: memos.store.TagsUserSetting
-	(*RefreshTokensUserSetting)(nil),              // 5: memos.store.RefreshTokensUserSetting
-	(*PersonalAccessTokensUserSetting)(nil),       // 6: memos.store.PersonalAccessTokensUserSetting
-	(*MemoViewsUserSetting)(nil),                  // 7: memos.store.MemoViewsUserSetting
-	(*WebhooksUserSetting)(nil),                   // 8: memos.store.WebhooksUserSetting
-	nil,                                           // 9: memos.store.TagsUserSetting.TagsEntry
-	(*RefreshTokensUserSetting_RefreshToken)(nil), // 10: memos.store.RefreshTokensUserSetting.RefreshToken
-	(*RefreshTokensUserSetting_ClientInfo)(nil),   // 11: memos.store.RefreshTokensUserSetting.ClientInfo
+	(UserSetting_Key)(0),                                        // 0: memos.store.UserSetting.Key
+	(*UserSetting)(nil),                                         // 1: memos.store.UserSetting
+	(*GeneralUserSetting)(nil),                                  // 2: memos.store.GeneralUserSetting
+	(*UserTagMetadata)(nil),                                     // 3: memos.store.UserTagMetadata
+	(*TagsUserSetting)(nil),                                     // 4: memos.store.TagsUserSetting
+	(*RefreshTokensUserSetting)(nil),                            // 5: memos.store.RefreshTokensUserSetting
+	(*PersonalAccessTokensUserSetting)(nil),                     // 6: memos.store.PersonalAccessTokensUserSetting
+	(*MemoViewsUserSetting)(nil),                                // 7: memos.store.MemoViewsUserSetting
+	(*WebhooksUserSetting)(nil),                                 // 8: memos.store.WebhooksUserSetting
+	nil,                                                         // 9: memos.store.TagsUserSetting.TagsEntry
+	(*RefreshTokensUserSetting_RefreshToken)(nil),               // 10: memos.store.RefreshTokensUserSetting.RefreshToken
+	(*RefreshTokensUserSetting_ClientInfo)(nil),                 // 11: memos.store.RefreshTokensUserSetting.ClientInfo
 	(*PersonalAccessTokensUserSetting_PersonalAccessToken)(nil), // 12: memos.store.PersonalAccessTokensUserSetting.PersonalAccessToken
 	(*MemoViewsUserSetting_MemoView)(nil),                       // 13: memos.store.MemoViewsUserSetting.MemoView
 	(*MemoViewsUserSetting_MemoView_Icon)(nil),                  // 14: memos.store.MemoViewsUserSetting.MemoView.Icon

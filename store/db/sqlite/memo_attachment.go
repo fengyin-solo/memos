@@ -91,6 +91,9 @@ func (d *DB) ApplyMemoMutation(ctx context.Context, mutation *store.MemoMutation
 			return errors.Wrap(store.ErrMemoMutationConflict, "attachment is no longer removable from the memo")
 		}
 	}
+	if err := releaseSQLiteAttachments(ctx, conn, removedAttachments); err != nil {
+		return errors.Wrap(err, "failed to release removed attachment blobs")
+	}
 
 	for _, binding := range mutation.Bindings {
 		var attachmentCreatorID int32

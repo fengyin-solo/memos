@@ -16,8 +16,18 @@ import (
 
 func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*store.Attachment, error) {
 	if create.Policy == nil {
-		id, err := insertMySQLAttachment(ctx, d.db, create)
+		// A transaction is required so the blob acquire and the attachment row
+		// commit together.
+		tx, err := d.db.BeginTx(ctx, nil)
 		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		id, err := insertMySQLAttachment(ctx, tx, create)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
 			return nil, err
 		}
 		return d.GetAttachment(ctx, &store.FindAttachment{ID: &id})
@@ -44,8 +54,15 @@ func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*s
 }
 
 func insertMySQLAttachment(ctx context.Context, executor memoUpdateExecer, create *store.Attachment) (int32, error) {
-	fields := []string{"`uid`", "`filename`", "`blob`", "`type`", "`size`", "`creator_id`", "`memo_id`", "`storage_type`", "`reference`", "`payload`"}
-	placeholder := []string{"?", "?", "?", "?", "?", "?", "?", "?", "?", "?"}
+	if create.BlobAcquire != nil {
+		blobID, err := acquireMySQLBlob(ctx, executor, create.BlobAcquire)
+		if err != nil {
+			return 0, err
+		}
+		create.BlobID = &blobID
+	}
+	fields := []string{"`uid`", "`filename`", "`blob`", "`type`", "`size`", "`creator_id`", "`memo_id`", "`storage_type`", "`reference`", "`payload`", "`blob_id`", "`blob_backfill_status`"}
+	placeholder := []string{"?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?", "?"}
 	storageType := ""
 	if create.StorageType != storepb.AttachmentStorageType_ATTACHMENT_STORAGE_TYPE_UNSPECIFIED {
 		storageType = create.StorageType.String()
@@ -58,7 +75,11 @@ func insertMySQLAttachment(ctx context.Context, executor memoUpdateExecer, creat
 		}
 		payloadString = string(bytes)
 	}
-	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString}
+	blobBackfillStatus := create.BlobBackfillStatus
+	if create.BlobAcquire != nil && blobBackfillStatus == "" {
+		blobBackfillStatus = store.AttachmentBlobBackfillDone
+	}
+	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString, create.BlobID, blobBackfillStatus}
 
 	stmt := "INSERT INTO `attachment` (" + strings.Join(fields, ", ") + ") VALUES (" + strings.Join(placeholder, ", ") + ")"
 	result, err := executor.ExecContext(ctx, stmt, args...)
@@ -143,6 +164,8 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		"`attachment`.`storage_type` AS `storage_type`",
 		"`attachment`.`reference` AS `reference`",
 		"`attachment`.`payload` AS `payload`",
+		"`attachment`.`blob_id` AS `blob_id`",
+		"`attachment`.`blob_backfill_status` AS `blob_backfill_status`",
 		"CASE WHEN `memo`.`uid` IS NOT NULL THEN `memo`.`uid` ELSE NULL END AS `memo_uid`",
 	}
 	if find.GetBlob {
@@ -173,6 +196,7 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		var memoID sql.NullInt32
 		var storageType string
 		var payloadBytes []byte
+		var blobID sql.NullInt64
 		dests := []any{
 			&attachment.ID,
 			&attachment.UID,
@@ -186,6 +210,8 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 			&storageType,
 			&attachment.Reference,
 			&payloadBytes,
+			&blobID,
+			&attachment.BlobBackfillStatus,
 			&attachment.MemoUID,
 		}
 		if find.GetBlob {
@@ -197,6 +223,9 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 
 		if memoID.Valid {
 			attachment.MemoID = &memoID.Int32
+		}
+		if blobID.Valid {
+			attachment.BlobID = &blobID.Int64
 		}
 		attachment.StorageType = storepb.AttachmentStorageType(storepb.AttachmentStorageType_value[storageType])
 		payload := &storepb.AttachmentPayload{}
@@ -307,17 +336,28 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 		return nil
 	}
 
+	ids := make([]int32, 0, len(deletes))
+	for _, delete := range deletes {
+		ids = append(ids, delete.ID)
+	}
+
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to start attachment delete transaction")
 	}
 	defer func() { _ = tx.Rollback() }()
-
+	attachments, err := listMySQLAttachmentsByIDs(ctx, tx, ids)
+	if err != nil {
+		return errors.Wrap(err, "failed to read attachment delete targets")
+	}
+	if len(attachments) != len(ids) {
+		return store.ErrMemoMutationConflict
+	}
+	if err := releaseMySQLAttachments(ctx, tx, attachments); err != nil {
+		return err
+	}
 	stmt := "DELETE FROM `attachment` WHERE `id` = ?"
 	for _, delete := range deletes {
-		if delete == nil {
-			continue
-		}
 		result, err := tx.ExecContext(ctx, stmt, delete.ID)
 		if err != nil {
 			return err
@@ -335,7 +375,7 @@ func listMySQLAttachmentsByIDs(ctx context.Context, tx *sql.Tx, attachmentIDs []
 	seen := make(map[int32]struct{}, len(attachmentIDs))
 	for _, batch := range deleteUserBatches(attachmentIDs, deleteUserBatchSize) {
 		clause, args := deleteUserInClause(1, batch)
-		if err := appendDeleteUserAttachments(ctx, tx, `SELECT id, uid, creator_id, memo_id, storage_type, reference, payload
+		if err := appendDeleteUserAttachments(ctx, tx, `SELECT id, uid, creator_id, memo_id, storage_type, reference, payload, blob_id
 			FROM attachment WHERE id IN `+clause+` ORDER BY id`, args, seen, &attachments); err != nil {
 			return nil, err
 		}

@@ -553,24 +553,21 @@ type ListMemosRequest struct {
 	OrderBy string `protobuf:"bytes,4,opt,name=order_by,json=orderBy,proto3" json:"order_by,omitempty"`
 	// Optional. A CEL expression to filter memos. Combine terms with && and ||.
 	// Available fields:
-	//
-	//	content (string), creator (string, e.g. "users/1"),
-	//	created_ts / updated_ts (timestamp), pinned (bool),
-	//	visibility (string: PRIVATE | PROTECTED | PUBLIC | SPACE),
-	//	space (string resource name, or null when the memo has no space;
-	//	  supports == and comparisons against null, e.g. space != null),
-	//	tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
-	//	has_task_list / has_link / has_code / has_incomplete_tasks (bool),
-	//	has_location (bool; true when the memo has a location attached).
-	//
+	//   content (string), creator (string, e.g. "users/1"),
+	//   created_ts / updated_ts (timestamp), pinned (bool),
+	//   visibility (string: PRIVATE | PROTECTED | PUBLIC | SPACE),
+	//   space (string resource name, or null when the memo has no space;
+	//     supports == and comparisons against null, e.g. space != null),
+	//   tags (list<string>; match with `"work" in tags`, not `tag == "work"`),
+	//   has_task_list / has_link / has_code / has_incomplete_tasks (bool),
+	//   has_location (bool; true when the memo has a location attached).
 	// Note: the time fields here are created_ts / updated_ts, which differ from
 	// the create_time / update_time names used by order_by.
 	// Examples:
-	//
-	//	pinned == true && visibility == "PUBLIC"
-	//	space == "spaces/team" or space == null
-	//	tags.exists(t, t == "urgent")
-	//	content.contains("roadmap") && created_ts > now - duration("168h")
+	//   pinned == true && visibility == "PUBLIC"
+	//   space == "spaces/team" or space == null
+	//   tags.exists(t, t == "urgent")
+	//   content.contains("roadmap") && created_ts > now - duration("168h")
 	Filter string `protobuf:"bytes,5,opt,name=filter,proto3" json:"filter,omitempty"`
 	// Optional. If true, show deleted memos in the response.
 	ShowDeleted   bool `protobuf:"varint,6,opt,name=show_deleted,json=showDeleted,proto3" json:"show_deleted,omitempty"`

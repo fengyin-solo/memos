@@ -28,6 +28,40 @@ type Driver interface {
 	DeleteAttachmentsWithPolicy(ctx context.Context, policy *AttachmentDeletionPolicy, attachmentIDs []int32) error
 	ApplyMemoMutation(ctx context.Context, mutation *MemoMutation) error
 
+	// Blob model related methods.
+	ListBlobs(ctx context.Context, find *FindBlob) ([]*Blob, error)
+	ListBlobEvents(ctx context.Context, find *FindBlobEvent) ([]*BlobEvent, error)
+	ListBlobOrphans(ctx context.Context, find *FindBlobOrphan) ([]*BlobOrphan, error)
+	CountAttachmentRefsByBlobs(ctx context.Context, blobIDs []int64) (map[int64]int32, error)
+	AppendBlobEvent(ctx context.Context, event *BlobEvent) error
+
+	// Backfill legacy attachments onto content-addressed blob rows.
+	ListBackfillAttachments(ctx context.Context, limit int) ([]*Attachment, error)
+	// BackfillAttachmentBlob binds attachment to its blob in one transaction,
+	// registering its previous physical location as a duplicate orphan when
+	// it differs from the blob's canonical location.
+	BackfillAttachmentBlob(ctx context.Context, attachment *Attachment, acquire *BlobAcquire, legacyLocation string) (duplicate bool, err error)
+	// MarkAttachmentBackfillStatus records FAILED/SKIPPED backfill state.
+	MarkAttachmentBackfillStatus(ctx context.Context, attachmentID int32, status string) error
+
+	// Garbage collection transactions.
+	// ClaimDueBlob locks and returns a PENDING_DELETE blob only when it is
+	// still unreferenced; resurrected or corrupt rows return nil.
+	ClaimDueBlob(ctx context.Context, blobID int64) (*Blob, error)
+	// FinishBlobDelete deletes the blob row and writes its completion event.
+	FinishBlobDelete(ctx context.Context, blob *Blob) error
+	// MarkBlobCorrupt flags the blob and records the detection event.
+	MarkBlobCorrupt(ctx context.Context, blob *Blob, detail string) error
+	// ListDueBlobOrphans lists PENDING orphans old enough to sweep.
+	ListDueBlobOrphans(ctx context.Context, beforeTs int64, limit int) ([]*BlobOrphan, error)
+	// DeleteBlobOrphan removes one processed orphan row.
+	DeleteBlobOrphan(ctx context.Context, orphanID int64) error
+	// BlobLocationReferenced reports whether any blob row uses location.
+	BlobLocationReferenced(ctx context.Context, storageID, location string) (bool, error)
+	// LegacyAttachmentAtLocation reports whether a not-backfilled managed
+	// attachment still occupies location.
+	LegacyAttachmentAtLocation(ctx context.Context, storageType, location string) (bool, error)
+
 	// Memo model related methods.
 	CreateMemo(ctx context.Context, create *Memo) (*Memo, error)
 	ListMemos(ctx context.Context, find *FindMemo) ([]*Memo, error)

@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	v4 "github.com/aws/aws-sdk-go-v2/aws/signer/v4" //nolint:revive // goimports insists on aliasing versioned import paths
@@ -47,6 +48,13 @@ type ObjectStream struct {
 	// ContentRange echoes the backend's Content-Range header for partial reads;
 	// empty when the whole object is returned.
 	ContentRange string
+}
+
+// ObjectMeta describes one stored object without its bytes.
+type ObjectMeta struct {
+	Key          string
+	Size         int64
+	LastModified time.Time
 }
 
 // Driver stores attachment objects in an S3-compatible object store.
@@ -224,4 +232,57 @@ func (c *Driver) DeleteObject(ctx context.Context, key string) error {
 		return errors.Wrap(err, "failed to delete object")
 	}
 	return nil
+}
+
+// ObjectExists reports whether key exists and returns its content length.
+func (c *Driver) ObjectExists(ctx context.Context, key string) (bool, int64, error) {
+	head, err := c.Client.HeadObject(ctx, &s3.HeadObjectInput{
+		Bucket: c.Bucket,
+		Key:    aws.String(key),
+	})
+	if err != nil {
+		var responseErr *awshttp.ResponseError
+		if errors.As(err, &responseErr) && responseErr.Response != nil && responseErr.Response.Response != nil && responseErr.Response.Response.StatusCode == http.StatusNotFound {
+			return false, 0, nil
+		}
+		return false, 0, errors.Wrap(err, "failed to head object")
+	}
+	size := int64(0)
+	if head.ContentLength != nil {
+		size = *head.ContentLength
+	}
+	return true, size, nil
+}
+
+// ListObjects lists object metadata under prefix, following pagination.
+func (c *Driver) ListObjects(ctx context.Context, prefix string) ([]ObjectMeta, error) {
+	objects := make([]ObjectMeta, 0)
+	input := &s3.ListObjectsV2Input{
+		Bucket: c.Bucket,
+		Prefix: aws.String(prefix),
+	}
+	var walkErr error
+
+	paginator := s3.NewListObjectsV2Paginator(c.Client, input)
+	for paginator.HasMorePages() {
+		page, err := paginator.NextPage(ctx)
+		if err != nil {
+			walkErr = err
+			break
+		}
+		for _, object := range page.Contents {
+			meta := ObjectMeta{Key: aws.ToString(object.Key)}
+			if object.Size != nil {
+				meta.Size = *object.Size
+			}
+			if object.LastModified != nil {
+				meta.LastModified = *object.LastModified
+			}
+			objects = append(objects, meta)
+		}
+	}
+	if walkErr != nil {
+		return nil, errors.Wrap(walkErr, "failed to list objects")
+	}
+	return objects, nil
 }

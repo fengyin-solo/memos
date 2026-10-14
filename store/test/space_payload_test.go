@@ -66,6 +66,7 @@ func TestMigrationSpacePayloadBackfillsDefault(t *testing.T) {
 	require.Nil(t, space.Payload.Icon)
 	_, err = ts.GetDriver().GetDB().ExecContext(ctx, "ALTER TABLE space DROP COLUMN payload")
 	require.NoError(t, err)
+	dropBlobSchema032(ctx, t, ts.GetDriver().GetDB())
 	setting, err := ts.GetInstanceBasicSetting(ctx)
 	require.NoError(t, err)
 	setting.SchemaVersion = "0.31.6"

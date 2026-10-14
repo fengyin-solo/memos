@@ -298,7 +298,14 @@ func TestSpaceServiceHardDeleteLifecycle(t *testing.T) {
 
 	_, err = service.DeleteSpace(userCtx(ctx, owner.ID), &v1pb.DeleteSpaceRequest{Name: space.Name})
 	require.NoError(t, err)
-	require.NoFileExists(t, attachmentPath)
+	// Content-addressed cleanup is deferred: the legacy attachment
+	// object survives and is registered for the blob orphan sweep.
+	require.FileExists(t, attachmentPath)
+	pendingOrphanStatus := store.BlobOrphanStatusPending
+	orphans, err := service.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{Status: &pendingOrphanStatus})
+	require.NoError(t, err)
+	require.Len(t, orphans, 1)
+	require.Equal(t, attachmentPath, orphans[0].Location)
 	_, err = service.GetSpace(userCtx(ctx, owner.ID), &v1pb.GetSpaceRequest{Name: space.Name})
 	require.Equal(t, codes.NotFound, status.Code(err))
 	spaces, err := service.ListSpaces(userCtx(ctx, owner.ID), &v1pb.ListSpacesRequest{})

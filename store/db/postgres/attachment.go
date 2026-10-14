@@ -16,7 +16,21 @@ import (
 
 func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*store.Attachment, error) {
 	if create.Policy == nil {
-		return insertPostgresAttachment(ctx, d.db, create)
+		// A transaction is required so the blob acquire and the attachment row
+		// commit together.
+		tx, err := d.db.BeginTx(ctx, nil)
+		if err != nil {
+			return nil, err
+		}
+		defer func() { _ = tx.Rollback() }()
+		attachment, err := insertPostgresAttachment(ctx, tx, create)
+		if err != nil {
+			return nil, err
+		}
+		if err := tx.Commit(); err != nil {
+			return nil, err
+		}
+		return attachment, nil
 	}
 	if create.MemoID == nil || create.CreatorID != create.Policy.ActorUserID {
 		return nil, store.ErrMemoPermissionDenied
@@ -39,12 +53,15 @@ func (d *DB) CreateAttachment(ctx context.Context, create *store.Attachment) (*s
 	return attachment, nil
 }
 
-type postgresAttachmentQueryRower interface {
-	QueryRowContext(context.Context, string, ...any) *sql.Row
-}
-
-func insertPostgresAttachment(ctx context.Context, executor postgresAttachmentQueryRower, create *store.Attachment) (*store.Attachment, error) {
-	fields := []string{"uid", "filename", "blob", "type", "size", "creator_id", "memo_id", "storage_type", "reference", "payload"}
+func insertPostgresAttachment(ctx context.Context, executor postgresBlobExecutor, create *store.Attachment) (*store.Attachment, error) {
+	if create.BlobAcquire != nil {
+		blobID, err := acquirePostgresBlob(ctx, executor, create.BlobAcquire)
+		if err != nil {
+			return nil, err
+		}
+		create.BlobID = &blobID
+	}
+	fields := []string{"uid", "filename", "blob", "type", "size", "creator_id", "memo_id", "storage_type", "reference", "payload", "blob_id", "blob_backfill_status"}
 	storageType := ""
 	if create.StorageType != storepb.AttachmentStorageType_ATTACHMENT_STORAGE_TYPE_UNSPECIFIED {
 		storageType = create.StorageType.String()
@@ -57,7 +74,11 @@ func insertPostgresAttachment(ctx context.Context, executor postgresAttachmentQu
 		}
 		payloadString = string(bytes)
 	}
-	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString}
+	blobBackfillStatus := create.BlobBackfillStatus
+	if create.BlobAcquire != nil && blobBackfillStatus == "" {
+		blobBackfillStatus = store.AttachmentBlobBackfillDone
+	}
+	args := []any{create.UID, create.Filename, create.Blob, create.Type, create.Size, create.CreatorID, create.MemoID, storageType, create.Reference, payloadString, create.BlobID, blobBackfillStatus}
 
 	stmt := "INSERT INTO attachment (" + strings.Join(fields, ", ") + ") VALUES (" + placeholders(len(args)) + ") RETURNING id, created_ts, updated_ts"
 	if err := executor.QueryRowContext(ctx, stmt, args...).Scan(&create.ID, &create.CreatedTs, &create.UpdatedTs); err != nil {
@@ -137,6 +158,8 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		"attachment.storage_type AS storage_type",
 		"attachment.reference AS reference",
 		"attachment.payload AS payload",
+		"attachment.blob_id AS blob_id",
+		"attachment.blob_backfill_status AS blob_backfill_status",
 		"CASE WHEN memo.uid IS NOT NULL THEN memo.uid ELSE NULL END AS memo_uid",
 	}
 	if find.GetBlob {
@@ -171,6 +194,7 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 		var memoID sql.NullInt32
 		var storageType string
 		var payloadBytes []byte
+		var blobID sql.NullInt64
 		dests := []any{
 			&attachment.ID,
 			&attachment.UID,
@@ -184,6 +208,8 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 			&storageType,
 			&attachment.Reference,
 			&payloadBytes,
+			&blobID,
+			&attachment.BlobBackfillStatus,
 			&attachment.MemoUID,
 		}
 		if find.GetBlob {
@@ -195,6 +221,9 @@ func (d *DB) ListAttachments(ctx context.Context, find *store.FindAttachment) ([
 
 		if memoID.Valid {
 			attachment.MemoID = &memoID.Int32
+		}
+		if blobID.Valid {
+			attachment.BlobID = &blobID.Int64
 		}
 		attachment.StorageType = storepb.AttachmentStorageType(storepb.AttachmentStorageType_value[storageType])
 		payload := &storepb.AttachmentPayload{}
@@ -293,15 +322,26 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 		return nil
 	}
 
+	ids := make([]int32, 0, len(deletes))
+	for _, delete := range deletes {
+		ids = append(ids, delete.ID)
+	}
+
 	tx, err := d.db.BeginTx(ctx, nil)
 	if err != nil {
 		return errors.Wrap(err, "failed to start attachment delete transaction")
 	}
-	defer func() {
-		if tx != nil {
-			_ = tx.Rollback()
-		}
-	}()
+	defer func() { _ = tx.Rollback() }()
+	attachments, err := listPostgresAttachmentSnapshots(ctx, tx, ids)
+	if err != nil {
+		return errors.Wrap(err, "failed to read attachment delete targets")
+	}
+	if len(attachments) != len(ids) {
+		return store.ErrMemoMutationConflict
+	}
+	if err := releasePostgresAttachments(ctx, tx, attachments); err != nil {
+		return err
+	}
 	stmt := `DELETE FROM attachment WHERE id = $1`
 	for _, delete := range deletes {
 		result, err := tx.ExecContext(ctx, stmt, delete.ID)
@@ -313,11 +353,7 @@ func (d *DB) DeleteAttachments(ctx context.Context, deletes []*store.DeleteAttac
 		}
 	}
 
-	if err := tx.Commit(); err != nil {
-		return err
-	}
-	tx = nil
-	return nil
+	return tx.Commit()
 }
 
 // GetAttachmentStorageUsage returns the total persisted attachment size for a creator in bytes.

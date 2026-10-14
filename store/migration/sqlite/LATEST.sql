@@ -94,8 +94,57 @@ CREATE TABLE attachment (
   memo_id INTEGER,
   storage_type TEXT NOT NULL DEFAULT '',
   reference TEXT NOT NULL DEFAULT '',
-  payload TEXT NOT NULL DEFAULT '{}'
+  payload TEXT NOT NULL DEFAULT '{}',
+  blob_id INTEGER DEFAULT NULL,
+  blob_backfill_status TEXT NOT NULL DEFAULT ''
 );
+
+CREATE INDEX idx_attachment_blob_id ON attachment(blob_id);
+
+-- blob
+CREATE TABLE blob (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  storage_id TEXT NOT NULL,
+  sha256 TEXT NOT NULL,
+  size BIGINT NOT NULL DEFAULT 0,
+  reference_count INTEGER NOT NULL DEFAULT 0,
+  status TEXT NOT NULL DEFAULT 'ACTIVE',
+  content BLOB DEFAULT NULL,
+  location TEXT NOT NULL DEFAULT '',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  orphaned_ts BIGINT DEFAULT NULL,
+  UNIQUE(storage_id, sha256)
+);
+
+CREATE INDEX idx_blob_status_orphaned ON blob(status, orphaned_ts);
+
+CREATE TABLE blob_event (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  blob_id INTEGER DEFAULT NULL,
+  storage_id TEXT NOT NULL DEFAULT '',
+  sha256 TEXT NOT NULL DEFAULT '',
+  type TEXT NOT NULL,
+  detail TEXT NOT NULL DEFAULT '{}',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX idx_blob_event_blob_id ON blob_event(blob_id);
+CREATE INDEX idx_blob_event_type_created ON blob_event(type, created_ts);
+
+CREATE TABLE blob_orphan (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  storage_id TEXT NOT NULL DEFAULT '',
+  storage_type TEXT NOT NULL DEFAULT '',
+  location TEXT NOT NULL DEFAULT '',
+  payload TEXT NOT NULL DEFAULT '{}',
+  reason TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'PENDING',
+  created_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now')),
+  updated_ts BIGINT NOT NULL DEFAULT (strftime('%s', 'now'))
+);
+
+CREATE INDEX idx_blob_orphan_status_created ON blob_orphan(status, created_ts);
 
 -- idp
 CREATE TABLE idp (

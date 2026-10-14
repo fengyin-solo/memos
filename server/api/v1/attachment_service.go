@@ -256,29 +256,21 @@ func (s *APIV1Service) processAndSaveAttachment(ctx context.Context, create *sto
 	if _, err := content.Seek(0, io.SeekStart); err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to rewind attachment content: %v", err)
 	}
-	if err := saveAttachmentContent(ctx, s.Profile, s.Store, create, instanceStorageSetting, content); err != nil {
+	objectExisted, err := saveAttachmentContent(ctx, s.Profile, s.Store, create, instanceStorageSetting, content)
+	if err != nil {
 		return nil, status.Errorf(codes.Internal, "failed to save attachment blob: %v", err)
 	}
-	return s.persistAttachment(ctx, create, instanceStorageSetting)
+	return s.persistAttachment(ctx, create, objectExisted)
 }
 
-func (s *APIV1Service) persistAttachment(ctx context.Context, create *store.Attachment, instanceStorageSetting *storepb.InstanceStorageSetting) (*v1pb.Attachment, error) {
+func (s *APIV1Service) persistAttachment(ctx context.Context, create *store.Attachment, objectExisted bool) (*v1pb.Attachment, error) {
 	attachment, err := s.Store.CreateAttachment(ctx, create)
 	if err != nil {
 		createErr := mapMemoWriteError(err, "failed to create attachment")
-		persistedObject, cleanupErr := cleanupSavedAttachmentBlob(ctx, s.Store, create, instanceStorageSetting)
-		if cleanupErr != nil {
-			slog.Error("failed to compensate attachment storage after database create failure",
-				slog.String("attachment_uid", create.UID),
-				slog.String("storage_type", create.StorageType.String()),
-				slog.Any("error", cleanupErr),
-			)
-		} else if persistedObject {
-			slog.Warn("attachment create returned an error after its storage object was persisted in the database; skipping compensation",
-				slog.String("attachment_uid", create.UID),
-				slog.String("storage_type", create.StorageType.String()),
-			)
-		}
+		// The content-addressed object may already be durable while
+		// the attachment/blob transaction failed; compensation removes a
+		// fresh object only when no committed blob row references it.
+		cleanupBlobUploadAfterCreateFailure(ctx, s.Profile, s.Store, create, objectExisted)
 		return nil, createErr
 	}
 	if create.MemoID != nil {

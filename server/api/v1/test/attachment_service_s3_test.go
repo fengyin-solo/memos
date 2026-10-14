@@ -49,9 +49,22 @@ func TestUploadAttachmentS3(t *testing.T) {
 	require.NoError(t, err)
 	require.Empty(t, row.Blob)
 	require.Equal(t, storepb.AttachmentStorageType_S3, row.StorageType)
-	content, err := fake.GetObject("uploads", row.Payload.GetS3Object().GetKey())
+	require.NotNil(t, row.BlobID)
+	blob, err := ts.Store.GetBlob(ctx, &store.FindBlob{ID: row.BlobID})
+	require.NoError(t, err)
+	require.Equal(t, storage.Id, blob.StorageID)
+	content, err := fake.GetObject("uploads", blob.Location)
 	require.NoError(t, err)
 	require.Equal(t, bytes.Repeat(chunk, 3), content)
+}
+
+func attachmentBlob(t *testing.T, ctx context.Context, ts *TestService, row *store.Attachment) *store.Blob {
+	t.Helper()
+	require.NotNil(t, row.BlobID)
+	blob, err := ts.Store.GetBlob(ctx, &store.FindBlob{ID: row.BlobID})
+	require.NoError(t, err)
+	require.NotNil(t, blob)
+	return blob
 }
 
 func runS3AttachmentLifecycleAcrossStorageChange(t *testing.T, objectStore *fakes3.Server) {
@@ -85,10 +98,9 @@ func runS3AttachmentLifecycleAcrossStorageChange(t *testing.T, objectStore *fake
 	require.Equal(t, storepb.AttachmentStorageType_S3, storedFirst.StorageType)
 	require.Empty(t, storedFirst.Blob)
 	require.Empty(t, storedFirst.Reference, "S3 attachments must not store a reference URL")
-	require.Equal(t, oldStorage.Id, storedFirst.Payload.GetS3Object().GetStorageId())
-	require.Nil(t, storedFirst.Payload.GetS3Object().GetS3Config(), "new attachments must not embed S3 credentials")
-
-	oldKey := storedFirst.Payload.GetS3Object().GetKey()
+	firstBlob := attachmentBlob(t, ctx, ts, storedFirst)
+	require.Equal(t, oldStorage.Id, firstBlob.StorageID)
+	oldKey := firstBlob.Location
 	storedInOldBucket, err := objectStore.GetObject("attachments-old", oldKey)
 	require.NoError(t, err)
 	require.Equal(t, firstContent, storedInOldBucket)
@@ -116,8 +128,9 @@ func runS3AttachmentLifecycleAcrossStorageChange(t *testing.T, objectStore *fake
 	require.NoError(t, err)
 	storedSecond, err := ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &secondUID})
 	require.NoError(t, err)
-	require.Equal(t, newStorage.Id, storedSecond.Payload.GetS3Object().GetStorageId())
-	newKey := storedSecond.Payload.GetS3Object().GetKey()
+	secondBlob := attachmentBlob(t, ctx, ts, storedSecond)
+	require.Equal(t, newStorage.Id, secondBlob.StorageID)
+	newKey := secondBlob.Location
 	storedInNewBucket, err := objectStore.GetObject("attachments-new", newKey)
 	require.NoError(t, err)
 	require.Equal(t, secondContent, storedInNewBucket)
@@ -133,11 +146,16 @@ func runS3AttachmentLifecycleAcrossStorageChange(t *testing.T, objectStore *fake
 
 	_, err = ts.Service.DeleteAttachment(userCtx, &v1pb.DeleteAttachmentRequest{Name: first.Name})
 	require.NoError(t, err)
+	// Content-addressed deletion is deferred to the blob GC: the old
+	// object survives as an orphan candidate while the new object stays.
 	_, err = objectStore.GetObject("attachments-old", oldKey)
-	require.Error(t, err, "deleting an attachment must delete its S3 object")
+	require.NoError(t, err)
 	remaining, err := objectStore.GetObject("attachments-new", newKey)
 	require.NoError(t, err)
 	require.Equal(t, secondContent, remaining)
+	orphans, err := ts.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{})
+	require.NoError(t, err)
+	require.Empty(t, orphans, "blob-backed attachments do not register legacy orphans")
 }
 
 func TestGetLegacyS3AttachmentBlob(t *testing.T) {
@@ -226,8 +244,20 @@ func TestGetLegacyS3AttachmentBlob(t *testing.T) {
 
 		_, err = ts.Service.DeleteAttachment(userCtx, &v1pb.DeleteAttachmentRequest{Name: apiv1.AttachmentNamePrefix + legacyAttachment.UID})
 		require.NoError(t, err)
+		// Legacy object deletion is deferred to the blob GC and
+		// registered as an orphan carrying the payload needed to
+		// resolve the current storage configuration.
 		_, err = fake.GetObject(currentConfig.Bucket, key)
-		require.Error(t, err, "deleting a legacy attachment must use the current matching storage configuration")
+		require.NoError(t, err, "legacy object must survive attachment deletion until the blob GC runs")
+		orphans, err := ts.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{})
+		require.NoError(t, err)
+		require.Len(t, orphans, 1)
+		require.Equal(t, key, orphans[0].Location)
+		// Embedded-config legacy attachment carry no storage id; the
+		// payload is kept so the sweeper can resolve the current
+		// matching namespace.
+		require.Empty(t, orphans[0].StorageID)
+		require.Contains(t, orphans[0].Payload, key)
 	})
 }
 
@@ -256,9 +286,9 @@ func upsertS3StorageSetting(ctx context.Context, t testing.TB, ts *TestService, 
 	require.NoError(t, err)
 }
 
-// Two uploads with the same filename under a path template that carries no
-// random component must not overwrite each other's object.
-func TestS3ObjectKeysStayUniqueWithoutUUIDTemplate(t *testing.T) {
+// Object keys are content-addressed: different content gets different
+// keys while identical content is shared.
+func TestS3ObjectKeysContentAddressed(t *testing.T) {
 	ts := NewTestService(t)
 	defer ts.Cleanup()
 	fake := fakes3.New(t, "flat")
@@ -272,13 +302,9 @@ func TestS3ObjectKeysStayUniqueWithoutUUIDTemplate(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	keys := map[string]bool{}
-	for i, username := range []string{"first-user", "second-user"} {
-		user, err := ts.CreateRegularUser(ctx, username)
-		require.NoError(t, err)
-		userCtx := ts.CreateUserContext(ctx, user.ID)
-		content := []byte("content of user " + username)
-		created, err := ts.Service.CreateAttachment(userCtx, &v1pb.CreateAttachmentRequest{Attachment: &v1pb.Attachment{
+	createRow := func(t *testing.T, userID int32, content []byte) (*store.Attachment, *store.Blob) {
+		t.Helper()
+		created, err := ts.Service.CreateAttachment(ts.CreateUserContext(ctx, userID), &v1pb.CreateAttachmentRequest{Attachment: &v1pb.Attachment{
 			Filename: "notes.txt", Type: "text/plain", Content: content,
 		}})
 		require.NoError(t, err)
@@ -286,11 +312,28 @@ func TestS3ObjectKeysStayUniqueWithoutUUIDTemplate(t *testing.T) {
 		require.NoError(t, err)
 		row, err := ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &uid})
 		require.NoError(t, err)
-		key := row.Payload.GetS3Object().GetKey()
-		require.False(t, keys[key], "upload %d reused key %q", i, key)
-		keys[key] = true
-		stored, err := fake.GetObject("flat", key)
-		require.NoError(t, err)
-		require.Equal(t, content, stored)
+		return row, attachmentBlob(t, ctx, ts, row)
 	}
+
+	first, err := ts.CreateRegularUser(ctx, "first-user")
+	require.NoError(t, err)
+	second, err := ts.CreateRegularUser(ctx, "second-user")
+	require.NoError(t, err)
+
+	firstContent := []byte("content of first user")
+	_, firstBlob := createRow(t, first.ID, firstContent)
+	secondContent := []byte("content of second user")
+	_, secondBlob := createRow(t, second.ID, secondContent)
+	require.NotEqual(t, firstBlob.Location, secondBlob.Location, "different content needs different keys")
+	stored, err := fake.GetObject("flat", firstBlob.Location)
+	require.NoError(t, err)
+	require.Equal(t, firstContent, stored)
+
+	// Identical content from another attachment shares the object and blob.
+	_, duplicateBlob := createRow(t, second.ID, firstContent)
+	require.Equal(t, firstBlob.ID, duplicateBlob.ID)
+	require.Equal(t, int32(2), duplicateBlob.ReferenceCount)
+	blobs, err := ts.Store.ListBlobs(ctx, &store.FindBlob{})
+	require.NoError(t, err)
+	require.Len(t, blobs, 2)
 }

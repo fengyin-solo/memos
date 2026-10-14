@@ -1259,8 +1259,18 @@ type InstanceSetting_StorageSetting struct {
 	Storages []*InstanceSetting_Storage `protobuf:"bytes,5,rep,name=storages,proto3" json:"storages,omitempty"`
 	// Storage used for new attachments.
 	DefaultStorageId string `protobuf:"bytes,6,opt,name=default_storage_id,json=defaultStorageId,proto3" json:"default_storage_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	// Time an unreferenced content-addressed blob is retained before physical
+	// deletion. 0 means the built-in default (7 days).
+	BlobGracePeriodSeconds int64 `protobuf:"varint,7,opt,name=blob_grace_period_seconds,json=blobGracePeriodSeconds,proto3" json:"blob_grace_period_seconds,omitempty"`
+	// Interval between automatic blob garbage collection runs. 0 means the
+	// built-in default (24 hours); a negative value disables scheduled
+	// collection (the administrator CLI command still works).
+	BlobGcIntervalSeconds int64 `protobuf:"varint,8,opt,name=blob_gc_interval_seconds,json=blobGcIntervalSeconds,proto3" json:"blob_gc_interval_seconds,omitempty"`
+	// Minimum age of an object with no blob record before the orphan sweep
+	// may delete it. 0 means the built-in default (1 hour).
+	BlobOrphanSafetyAgeSeconds int64 `protobuf:"varint,9,opt,name=blob_orphan_safety_age_seconds,json=blobOrphanSafetyAgeSeconds,proto3" json:"blob_orphan_safety_age_seconds,omitempty"`
+	unknownFields              protoimpl.UnknownFields
+	sizeCache                  protoimpl.SizeCache
 }
 
 func (x *InstanceSetting_StorageSetting) Reset() {
@@ -1333,6 +1343,27 @@ func (x *InstanceSetting_StorageSetting) GetDefaultStorageId() string {
 		return x.DefaultStorageId
 	}
 	return ""
+}
+
+func (x *InstanceSetting_StorageSetting) GetBlobGracePeriodSeconds() int64 {
+	if x != nil {
+		return x.BlobGracePeriodSeconds
+	}
+	return 0
+}
+
+func (x *InstanceSetting_StorageSetting) GetBlobGcIntervalSeconds() int64 {
+	if x != nil {
+		return x.BlobGcIntervalSeconds
+	}
+	return 0
+}
+
+func (x *InstanceSetting_StorageSetting) GetBlobOrphanSafetyAgeSeconds() int64 {
+	if x != nil {
+		return x.BlobOrphanSafetyAgeSeconds
+	}
+	return 0
 }
 
 // Memo-related instance settings and policies.
@@ -2272,7 +2303,7 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\tChallenge\x12\x1a\n" +
 	"\bprovider\x18\x01 \x01(\tR\bprovider\x12\x19\n" +
 	"\bsite_key\x18\x02 \x01(\tR\asiteKey\"\x1b\n" +
-	"\x19GetInstanceProfileRequest\"\xd0\"\n" +
+	"\x19GetInstanceProfileRequest\"\x88$\n" +
 	"\x0fInstanceSetting\x12\x17\n" +
 	"\x04name\x18\x01 \x01(\tB\x03\xe0A\bR\x04name\x12W\n" +
 	"\x0fgeneral_setting\x18\x02 \x01(\v2,.memos.api.v1.InstanceSetting.GeneralSettingH\x00R\x0egeneralSetting\x12W\n" +
@@ -2310,14 +2341,17 @@ const file_api_v1_instance_service_proto_rawDesc = "" +
 	"\x06bucket\x18\x05 \x01(\tR\x06bucket\x12$\n" +
 	"\x0euse_path_style\x18\x06 \x01(\bR\fusePathStyle\x127\n" +
 	"\x18insecure_skip_tls_verify\x18\a \x01(\bR\x15insecureSkipTlsVerifyB\b\n" +
-	"\x06config\x1a\xeb\x05\n" +
+	"\x06config\x1a\xa3\a\n" +
 	"\x0eStorageSetting\x12[\n" +
 	"\fstorage_type\x18\x01 \x01(\x0e28.memos.api.v1.InstanceSetting.StorageSetting.StorageTypeR\vstorageType\x12+\n" +
 	"\x11filepath_template\x18\x02 \x01(\tR\x10filepathTemplate\x12/\n" +
 	"\x14upload_size_limit_mb\x18\x03 \x01(\x03R\x11uploadSizeLimitMb\x12R\n" +
 	"\ts3_config\x18\x04 \x01(\v25.memos.api.v1.InstanceSetting.StorageSetting.S3ConfigR\bs3Config\x12A\n" +
 	"\bstorages\x18\x05 \x03(\v2%.memos.api.v1.InstanceSetting.StorageR\bstorages\x12,\n" +
-	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\x1a\x8a\x02\n" +
+	"\x12default_storage_id\x18\x06 \x01(\tR\x10defaultStorageId\x129\n" +
+	"\x19blob_grace_period_seconds\x18\a \x01(\x03R\x16blobGracePeriodSeconds\x127\n" +
+	"\x18blob_gc_interval_seconds\x18\b \x01(\x03R\x15blobGcIntervalSeconds\x12B\n" +
+	"\x1eblob_orphan_safety_age_seconds\x18\t \x01(\x03R\x1ablobOrphanSafetyAgeSeconds\x1a\x8a\x02\n" +
 	"\bS3Config\x12\"\n" +
 	"\raccess_key_id\x18\x01 \x01(\tR\vaccessKeyId\x12/\n" +
 	"\x11access_key_secret\x18\x02 \x01(\tB\x03\xe0A\x04R\x0faccessKeySecret\x12\x1a\n" +

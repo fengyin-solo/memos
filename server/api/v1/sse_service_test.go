@@ -215,9 +215,8 @@ func TestDeleteAttachmentPublishesBeforeStorageCleanupFailure(t *testing.T) {
 
 	client := svc.SSEHub.Subscribe()
 	defer svc.SSEHub.Unsubscribe(client)
-	_, err = svc.DeleteAttachment(store.WithDeleteAttachmentStorageFailpoint(ownerCtx), &v1pb.DeleteAttachmentRequest{Name: attachment.Name})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "attachments were deleted but storage cleanup failed")
+	_, err = svc.DeleteAttachment(ownerCtx, &v1pb.DeleteAttachmentRequest{Name: attachment.Name})
+	require.NoError(t, err)
 	requireMemoChanged(t, client.events)
 	requireNoMemoChanged(t, client.events)
 
@@ -654,8 +653,16 @@ func TestDeleteMemoCleansAttachmentStorage(t *testing.T) {
 	deletedAttachment, err := svc.Store.GetAttachment(ctx, &store.FindAttachment{ID: &attachment.ID})
 	require.NoError(t, err)
 	require.Nil(t, deletedAttachment)
+	// Content-addressed cleanup is deferred to the blob garbage
+	// collector: the legacy object remains and is registered as an
+	// orphan candidate.
 	_, err = os.Stat(attachmentPath)
-	require.ErrorIs(t, err, os.ErrNotExist)
+	require.NoError(t, err)
+	pendingOrphanStatus := store.BlobOrphanStatusPending
+	orphans, err := svc.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{Status: &pendingOrphanStatus})
+	require.NoError(t, err)
+	require.Len(t, orphans, 1)
+	require.Equal(t, attachmentPath, orphans[0].Location)
 }
 
 func TestSetMemoAttachmentsPublishesMemoChanged(t *testing.T) {

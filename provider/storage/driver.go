@@ -14,12 +14,15 @@ import (
 // the object, so HTTP handlers can answer 416 instead of 500.
 var ErrRangeNotSatisfiable = s3.ErrRangeNotSatisfiable
 
-// RangeNotSatisfiableError carries response metadata for an unsatisfied range.
+// RangeNotSatisfiableError carries response metadata for an unsatisfied read.
 type RangeNotSatisfiableError = s3.RangeNotSatisfiableError
 
 // ObjectStream is object content with the metadata needed to answer HTTP
 // range requests. Aliased so driver consumers never import a concrete backend.
 type ObjectStream = s3.ObjectStream
+
+// ObjectMeta describes one stored object without its bytes.
+type ObjectMeta = s3.ObjectMeta
 
 // Driver provides object operations for a configured attachment storage.
 type Driver interface {
@@ -30,6 +33,11 @@ type Driver interface {
 	// most one range because S3 does not support multipart range responses.
 	GetObjectStream(ctx context.Context, key string, byteRange string) (*ObjectStream, error)
 	DeleteObject(ctx context.Context, key string) error
+	// ObjectExists reports whether an object exists at key and returns its
+	// byte size when it does.
+	ObjectExists(ctx context.Context, key string) (bool, int64, error)
+	// ListObjects lists object metadata under key prefix.
+	ListObjects(ctx context.Context, prefix string) ([]ObjectMeta, error)
 }
 
 // NewDriver creates the driver for a configured storage.

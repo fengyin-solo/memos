@@ -60,8 +60,12 @@ func (r *attachmentContextReader) Read(p []byte) (int, error) {
 	return r.reader.Read(p)
 }
 
-// saveAttachmentContent writes content to the default storage and records
-// where it went on create. Database storage keeps the bytes on create.Blob.
+// saveAttachmentContent writes the processed attachment bytes to a
+// content-addressed object in the default storage and fills
+// create.BlobAcquire so the attachment insert binds the blob row in the
+// same transaction. It reports whether the physical object already
+// existed and was shared; callers must not delete such an object on
+// failure.
 func saveAttachmentContent(
 	ctx context.Context,
 	profile *profile.Profile,
@@ -69,154 +73,19 @@ func saveAttachmentContent(
 	create *store.Attachment,
 	instanceStorageSetting *storepb.InstanceStorageSetting,
 	content io.Reader,
-) error {
+) (bool, error) {
 	defaultStorage := store.GetDefaultStorage(instanceStorageSetting)
 	if defaultStorage == nil {
-		return errors.New("default storage is not configured")
+		return false, errors.New("default storage is not configured")
 	}
 
-	if defaultStorage.Type == storepb.StorageType_STORAGE_TYPE_LOCAL {
-		filepathTemplate := "assets/{timestamp}_{uuid}_{filename}"
-		if instanceStorageSetting.FilepathTemplate != "" {
-			filepathTemplate = instanceStorageSetting.FilepathTemplate
-		}
-
-		internalPath := filepathTemplate
-		if !strings.Contains(internalPath, "{filename}") {
-			internalPath = filepath.Join(internalPath, "{filename}")
-		}
-		internalPath = replaceFilenameWithPathTemplate(internalPath, create.Filename)
-		internalPath = filepath.ToSlash(internalPath)
-
-		// Ensure the directory exists.
-		osPath := filepath.FromSlash(internalPath)
-		if !filepath.IsAbs(osPath) {
-			osPath = filepath.Join(profile.Data, osPath)
-		}
-		osPath = ensureUniqueLocalAttachmentPath(osPath, create.UID)
-		internalPath = filepath.ToSlash(osPath)
-		if !filepath.IsAbs(filepath.FromSlash(internalPath)) {
-			relativePath, err := filepath.Rel(profile.Data, osPath)
-			if err != nil {
-				return errors.Wrap(err, "Failed to get relative path")
-			}
-			internalPath = filepath.ToSlash(relativePath)
-		}
-		dir := filepath.Dir(osPath)
-		if err := os.MkdirAll(dir, os.ModePerm); err != nil {
-			return errors.Wrap(err, "Failed to create directory")
-		}
-
-		// Stage in a temp file so partial content never appears at the final path.
-		file, err := os.CreateTemp(dir, ".memos-upload-*")
-		if err != nil {
-			return errors.Wrap(err, "failed to create attachment file")
-		}
-		defer os.Remove(file.Name())
-		defer file.Close()
-		if _, err := io.Copy(file, &attachmentContextReader{ctx: ctx, reader: content}); err != nil {
-			return errors.Wrap(err, "failed to write attachment file")
-		}
-		if err := file.Chmod(0644); err != nil {
-			return errors.Wrap(err, "failed to set attachment permissions")
-		}
-		if err := file.Close(); err != nil {
-			return errors.Wrap(err, "failed to close attachment file")
-		}
-		if err := os.Rename(file.Name(), osPath); err != nil {
-			return errors.Wrap(err, "failed to finalize attachment file")
-		}
-		create.Reference = internalPath
-		create.Blob = nil
-		create.StorageType = storepb.AttachmentStorageType_LOCAL
-	} else if defaultStorage.Type == storepb.StorageType_STORAGE_TYPE_S3 {
-		driver, err := stores.StorageDriver(ctx, defaultStorage)
-		if err != nil {
-			return errors.Wrap(err, "failed to create storage driver")
-		}
-
-		filepathTemplate := instanceStorageSetting.FilepathTemplate
-		if !strings.Contains(filepathTemplate, "{filename}") {
-			filepathTemplate = filepath.Join(filepathTemplate, "{filename}")
-		}
-		objectKey := replaceFilenameWithPathTemplate(filepathTemplate, create.Filename)
-		if !strings.Contains(filepathTemplate, "{uuid}") {
-			// PutObject overwrites silently, and two users can pick the same
-			// filename in the same second, so a template without a random
-			// component gets the attachment UID appended to keep keys unique.
-			ext := filepath.Ext(objectKey)
-			objectKey = strings.TrimSuffix(objectKey, ext) + "_" + create.UID + ext
-		}
-		key, err := driver.UploadObject(ctx, objectKey, create.Type, content)
-		if err != nil {
-			return errors.Wrap(err, "failed to upload via storage driver")
-		}
-
-		// S3 attachments carry no reference; they are served via the authenticated file route.
-		create.Blob = nil
-		create.StorageType = storepb.AttachmentStorageType_S3
-		payload := ensureAttachmentPayload(create.Payload)
-		payload.Payload = &storepb.AttachmentPayload_S3Object_{
-			S3Object: &storepb.AttachmentPayload_S3Object{
-				Key:       key,
-				StorageId: defaultStorage.Id,
-			},
-		}
-		create.Payload = payload
-	} else {
-		blob, err := io.ReadAll(content)
-		if err != nil {
-			return errors.Wrap(err, "failed to read attachment content")
-		}
-		create.Blob = blob
-	}
-
-	return nil
-}
-
-func cleanupSavedAttachmentBlob(
-	ctx context.Context,
-	stores *store.Store,
-	attachment *store.Attachment,
-	instanceStorageSetting *storepb.InstanceStorageSetting,
-) (bool, error) {
-	if attachment == nil || (attachment.StorageType != storepb.AttachmentStorageType_LOCAL && attachment.StorageType != storepb.AttachmentStorageType_S3) {
-		return false, nil
-	}
-
-	cleanupCtx, cancelCleanup := context.WithTimeout(context.WithoutCancel(ctx), 30*time.Second)
-	defer cancelCleanup()
-	persisted, err := stores.GetAttachment(cleanupCtx, &store.FindAttachment{UID: &attachment.UID})
-	if err != nil {
-		return false, errors.Wrap(err, "failed to verify attachment create outcome")
-	}
-	if hasSameManagedStorageObject(persisted, attachment) {
-		return true, nil
-	}
-	return false, stores.DeleteAttachmentStorageWithInstanceSetting(cleanupCtx, attachment, instanceStorageSetting)
-}
-
-func hasSameManagedStorageObject(left, right *store.Attachment) bool {
-	if left == nil || right == nil || left.StorageType != right.StorageType {
-		return false
-	}
-	switch left.StorageType {
-	case storepb.AttachmentStorageType_LOCAL:
-		return left.Reference != "" && left.Reference == right.Reference
-	case storepb.AttachmentStorageType_S3:
-		leftObject, rightObject := left.Payload.GetS3Object(), right.Payload.GetS3Object()
-
-		if leftObject == nil || rightObject == nil {
-			return false
-		}
-
-		if leftObject.Key == "" || rightObject.Key == "" {
-			return false
-		}
-
-		return leftObject.Key == rightObject.Key && leftObject.StorageId == rightObject.StorageId
+	switch defaultStorage.Type {
+	case storepb.StorageType_STORAGE_TYPE_LOCAL:
+		return storeLocalBlob(ctx, profile.Data, content, create)
+	case storepb.StorageType_STORAGE_TYPE_S3:
+		return storeS3Blob(ctx, stores, defaultStorage.Id, create.Type, content, create)
 	default:
-		return false
+		return false, storeDatabaseBlob(content, create)
 	}
 }
 
@@ -263,9 +132,43 @@ func (s *APIV1Service) GetAttachmentBlob(ctx context.Context, attachment *store.
 }
 
 // openAttachmentContent streams an attachment from its configured storage.
-// Database-backed attachments are re-read with their blob when the caller
-// listed them without it.
+// Content-addressed attachments resolve the physical object through their blob
+// row; legacy attachments keep using reference/payload/inline bytes.
 func (s *APIV1Service) openAttachmentContent(ctx context.Context, attachment *store.Attachment) (io.ReadCloser, error) {
+	if attachment.BlobID != nil {
+		blob, err := s.Store.GetAttachmentBlob(ctx, attachment)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to load attachment blob")
+		}
+		if blob == nil {
+			return nil, errors.New("attachment blob not found")
+		}
+		switch blob.StorageID {
+		case store.BlobStorageLocalID:
+			attachmentPath := filepath.Join(s.Profile.Data, filepath.FromSlash(blob.Location))
+			file, err := os.Open(attachmentPath)
+			if err != nil {
+				if os.IsNotExist(err) {
+					return nil, errors.Wrap(err, "file not found")
+				}
+				return nil, errors.Wrap(err, "failed to open the file")
+			}
+			return file, nil
+		case store.BlobStorageDatabaseID:
+			return io.NopCloser(bytes.NewReader(blob.Content)), nil
+		default:
+			driver, err := s.Store.StorageDriverByID(ctx, blob.StorageID)
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to resolve blob storage driver")
+			}
+			object, err := driver.GetObjectStream(ctx, blob.Location, "")
+			if err != nil {
+				return nil, errors.Wrap(err, "failed to stream blob object from S3")
+			}
+			return object.Body, nil
+		}
+	}
+
 	switch attachment.StorageType {
 	case storepb.AttachmentStorageType_LOCAL:
 		attachmentPath := filepath.FromSlash(attachment.Reference)

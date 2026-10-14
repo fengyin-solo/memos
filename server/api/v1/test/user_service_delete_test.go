@@ -521,7 +521,7 @@ func TestDeleteUserRollbackPreservesAllResources(t *testing.T) {
 	require.NotNil(t, patSetting)
 }
 
-func TestDeleteUserReportsPostCommitAttachmentStorageCleanupFailure(t *testing.T) {
+func TestDeleteUserDefersLegacyAttachmentCleanup(t *testing.T) {
 	t.Parallel()
 
 	ts := NewTestService(t)
@@ -546,16 +546,18 @@ func TestDeleteUserReportsPostCommitAttachmentStorageCleanupFailure(t *testing.T
 	require.NoError(t, os.WriteFile(attachmentPath, []byte("failure"), 0o600))
 
 	headerCtx := apiv1.WithHeaderCarrier(ctx)
-	authCtx := ts.CreateUserContext(store.WithDeleteAttachmentStorageFailpoint(headerCtx), user.ID)
+	authCtx := ts.CreateUserContext(headerCtx, user.ID)
 	_, err = ts.Service.DeleteUser(authCtx, &v1pb.DeleteUserRequest{
 		Name: apiv1.BuildUserName(user.Username),
 	})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "user was deleted but attachment storage cleanup failed")
-	require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+	require.NoError(t, err)
 
 	deletedUser, err := ts.Store.GetUser(ctx, &store.FindUser{ID: &user.ID})
 	require.NoError(t, err)
 	require.Nil(t, deletedUser)
-	require.FileExists(t, attachmentPath, "storage cleanup failure happens after the database deletion commits")
+	// The legacy attachment object survives and becomes an orphan candidate.
+	require.FileExists(t, attachmentPath, "legacy attachment objects wait for the blob garbage collector")
+	orphans, err := ts.Store.ListBlobOrphans(ctx, &store.FindBlobOrphan{})
+	require.NoError(t, err)
+	require.Len(t, orphans, 1)
 }

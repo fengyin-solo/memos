@@ -114,7 +114,7 @@ func deleteUserTargetsTx(ctx context.Context, tx *sql.Tx, userID int32, targets 
 	if err := deleteReactionsByMemoIDsTx(ctx, tx, memoIDs); err != nil {
 		return err
 	}
-	if err := deleteAttachmentsByIDsTx(ctx, tx, targets.attachmentIDs); err != nil {
+	if err := deleteAttachmentsByIDsTx(ctx, tx, targets.attachments); err != nil {
 		return err
 	}
 	if err := deleteReactionsByCreatorTx(ctx, tx, userID); err != nil {
@@ -174,7 +174,8 @@ func listDeleteUserAttachments(ctx context.Context, tx *sql.Tx, userID int32, me
 			memo_id,
 			storage_type,
 			reference,
-			payload
+			payload,
+			blob_id
 		FROM attachment
 		WHERE creator_id = `+deleteUserPlaceholder(1), []any{userID}, seen, &attachments); err != nil {
 		return nil, err
@@ -190,7 +191,8 @@ func listDeleteUserAttachments(ctx context.Context, tx *sql.Tx, userID int32, me
 				memo_id,
 				storage_type,
 				reference,
-				payload
+				payload,
+				blob_id
 			FROM attachment
 			WHERE memo_id IN `+clause, args, seen, &attachments); err != nil {
 			return nil, err
@@ -212,7 +214,8 @@ func appendDeleteUserAttachments(ctx context.Context, tx *sql.Tx, query string, 
 		var memoID sql.NullInt32
 		var storageType string
 		var payloadBytes []byte
-		if err := rows.Scan(&attachment.ID, &attachment.UID, &attachment.CreatorID, &memoID, &storageType, &attachment.Reference, &payloadBytes); err != nil {
+		var blobID sql.NullInt64
+		if err := rows.Scan(&attachment.ID, &attachment.UID, &attachment.CreatorID, &memoID, &storageType, &attachment.Reference, &payloadBytes, &blobID); err != nil {
 			return err
 		}
 		if _, exists := seen[attachment.ID]; exists {
@@ -221,6 +224,9 @@ func appendDeleteUserAttachments(ctx context.Context, tx *sql.Tx, query string, 
 		seen[attachment.ID] = struct{}{}
 		if memoID.Valid {
 			attachment.MemoID = &memoID.Int32
+		}
+		if blobID.Valid {
+			attachment.BlobID = &blobID.Int64
 		}
 		attachment.StorageType = storepb.AttachmentStorageType(storepb.AttachmentStorageType_value[storageType])
 		payload := &storepb.AttachmentPayload{}
@@ -298,7 +304,11 @@ func deleteReactionsByMemoIDsTx(ctx context.Context, tx *sql.Tx, memoIDs []int32
 	return nil
 }
 
-func deleteAttachmentsByIDsTx(ctx context.Context, tx *sql.Tx, attachmentIDs []int32) error {
+func deleteAttachmentsByIDsTx(ctx context.Context, tx *sql.Tx, attachments []*store.Attachment) error {
+	if err := releasePostgresAttachments(ctx, tx, attachments); err != nil {
+		return err
+	}
+	attachmentIDs := attachmentIDsFromList(attachments)
 	for _, batch := range deleteUserBatches(attachmentIDs, deleteUserBatchSize) {
 		clause, args := deleteUserInClause(1, batch)
 		if _, err := tx.ExecContext(ctx, `DELETE FROM attachment WHERE id IN `+clause, args...); err != nil {

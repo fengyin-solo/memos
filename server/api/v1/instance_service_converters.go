@@ -163,10 +163,13 @@ func convertInstanceStorageSettingFromStore(settingpb *storepb.InstanceStorageSe
 		return nil
 	}
 	setting := &v1pb.InstanceSetting_StorageSetting{
-		StorageType:       v1pb.InstanceSetting_StorageSetting_StorageType(settingpb.StorageType),
-		FilepathTemplate:  settingpb.FilepathTemplate,
-		UploadSizeLimitMb: settingpb.UploadSizeLimitMb,
-		DefaultStorageId:  settingpb.DefaultStorageId,
+		StorageType:                v1pb.InstanceSetting_StorageSetting_StorageType(settingpb.StorageType),
+		FilepathTemplate:           settingpb.FilepathTemplate,
+		UploadSizeLimitMb:          settingpb.UploadSizeLimitMb,
+		DefaultStorageId:           settingpb.DefaultStorageId,
+		BlobGracePeriodSeconds:     settingpb.BlobGracePeriodSeconds,
+		BlobGcIntervalSeconds:      settingpb.BlobGcIntervalSeconds,
+		BlobOrphanSafetyAgeSeconds: settingpb.BlobOrphanSafetyAgeSeconds,
 	}
 	for _, storagepb := range settingpb.Storages {
 		setting.Storages = append(setting.Storages, convertStorageFromStore(storagepb))
@@ -190,10 +193,13 @@ func convertInstanceStorageSettingToStore(setting *v1pb.InstanceSetting_StorageS
 		return nil
 	}
 	settingpb := &storepb.InstanceStorageSetting{
-		StorageType:       storepb.InstanceStorageSetting_StorageType(setting.StorageType),
-		FilepathTemplate:  setting.FilepathTemplate,
-		UploadSizeLimitMb: setting.UploadSizeLimitMb,
-		DefaultStorageId:  setting.DefaultStorageId,
+		StorageType:                storepb.InstanceStorageSetting_StorageType(setting.StorageType),
+		FilepathTemplate:           setting.FilepathTemplate,
+		UploadSizeLimitMb:          setting.UploadSizeLimitMb,
+		DefaultStorageId:           setting.DefaultStorageId,
+		BlobGracePeriodSeconds:     setting.BlobGracePeriodSeconds,
+		BlobGcIntervalSeconds:      setting.BlobGcIntervalSeconds,
+		BlobOrphanSafetyAgeSeconds: setting.BlobOrphanSafetyAgeSeconds,
 	}
 	for _, storage := range setting.Storages {
 		settingpb.Storages = append(settingpb.Storages, convertStorageToStore(storage))
