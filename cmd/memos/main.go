@@ -67,6 +67,7 @@ func init() {
 	rootCmd.Flags().StringSlice("webhook-private-network-allowlist", nil, "private webhook destinations to allow (exact hostname, IP, or CIDR)")
 	rootCmd.Flags().String("log-level", "info", "log verbosity level (debug, info, warn, error)")
 	rootCmd.Flags().Bool("rate-limit", true, "enable request rate limiting")
+	rootCmd.Flags().String("rate-limit-driver", profile.RateLimitDriverMemory, "rate limiter backend: \"memory\" (default; per-process counters) or \"database\" (shared counters so multiple instances draw from one budget)")
 	rootCmd.Flags().StringSlice("trusted-proxies", []string{"private"}, "proxies whose forwarding headers identify the client: CIDRs, IPs, \"private\" (default; the loopback and private ranges), or \"none\" when the instance is reached without a header-rewriting proxy")
 
 	if err := rootCmd.Flags().MarkDeprecated("allow-private-webhooks", "use --webhook-private-network-allowlist to allow only required destinations"); err != nil {
@@ -85,6 +86,7 @@ func init() {
 		"webhook-private-network-allowlist",
 		"log-level",
 		"rate-limit",
+		"rate-limit-driver",
 		"trusted-proxies",
 	} {
 		if err := viper.BindPFlag(key, rootCmd.Flags().Lookup(key)); err != nil {
@@ -109,18 +111,19 @@ func init() {
 
 func runServer() error {
 	instanceProfile := &profile.Profile{
-		Demo:           viper.GetBool("demo"),
-		Addr:           viper.GetString("addr"),
-		Port:           viper.GetInt("port"),
-		UNIXSock:       viper.GetString("unix-sock"),
-		Data:           viper.GetString("data"),
-		Driver:         viper.GetString("driver"),
-		DSN:            viper.GetString("dsn"),
-		InstanceURL:    viper.GetString("instance-url"),
-		RateLimit:      viper.GetBool("rate-limit"),
-		TrustedProxies: viper.GetStringSlice("trusted-proxies"),
-		Version:        version.GetCurrentVersion(),
-		Commit:         version.Commit,
+		Demo:            viper.GetBool("demo"),
+		Addr:            viper.GetString("addr"),
+		Port:            viper.GetInt("port"),
+		UNIXSock:        viper.GetString("unix-sock"),
+		Data:            viper.GetString("data"),
+		Driver:          viper.GetString("driver"),
+		DSN:             viper.GetString("dsn"),
+		InstanceURL:     viper.GetString("instance-url"),
+		RateLimit:       viper.GetBool("rate-limit"),
+		RateLimitDriver: viper.GetString("rate-limit-driver"),
+		TrustedProxies:  viper.GetStringSlice("trusted-proxies"),
+		Version:         version.GetCurrentVersion(),
+		Commit:          version.Commit,
 	}
 
 	allowPrivateWebhooks := viper.GetBool("allow-private-webhooks")

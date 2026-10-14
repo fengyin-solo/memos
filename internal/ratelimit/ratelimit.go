@@ -1,6 +1,8 @@
 // Package ratelimit bounds how often a caller may do something. It provides a
-// declarative policy table, an in-memory sliding-window limiter, and the
-// seams a deployment fills to add a challenge or a signup policy.
+// declarative policy table, an in-memory sliding-window limiter, a
+// database-backed limiter sharing one budget across instances through the
+// WindowStore seam, and the seams a deployment fills to add a challenge or a
+// signup policy.
 package ratelimit
 
 import (

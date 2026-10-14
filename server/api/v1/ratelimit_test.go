@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"context"
 	"strings"
 	"testing"
 	"time"
@@ -12,8 +13,44 @@ import (
 	"google.golang.org/grpc/status"
 
 	"github.com/usememos/memos/internal/identifier"
+	"github.com/usememos/memos/internal/profile"
 	"github.com/usememos/memos/internal/ratelimit"
 )
+
+// noopWindowStore satisfies ratelimit.WindowStore without a database, for
+// wiring tests.
+type noopWindowStore struct{}
+
+func (noopWindowStore) ApplyWindow(context.Context, ratelimit.Scope, string, ratelimit.WindowOp) (ratelimit.WindowState, bool, error) {
+	return ratelimit.WindowState{}, false, nil
+}
+
+func (noopWindowStore) DeleteExpiredWindows(context.Context, []ratelimit.WindowExpiry) (int64, error) {
+	return 0, nil
+}
+
+func TestNewProfileRateLimiterSelection(t *testing.T) {
+	windows := noopWindowStore{}
+
+	require.Nil(t, newProfileRateLimiter(&profile.Profile{RateLimit: false}, windows), "rate limiting off yields no limiter")
+
+	memory := newProfileRateLimiter(&profile.Profile{
+		RateLimit: true, RateLimitDriver: profile.RateLimitDriverMemory,
+	}, windows)
+	require.IsType(t, &ratelimit.MemoryLimiter{}, memory)
+
+	shared := newProfileRateLimiter(&profile.Profile{
+		RateLimit: true, RateLimitDriver: profile.RateLimitDriverDatabase,
+	}, windows)
+	storeBacked, ok := shared.(*ratelimit.StoreBackedLimiter)
+	require.True(t, ok, "the database driver selects the shared limiter")
+	storeBacked.Close()
+
+	// An unset driver behaves like the default, in-memory implementation.
+	require.IsType(t, &ratelimit.MemoryLimiter{}, newProfileRateLimiter(&profile.Profile{
+		RateLimit: true,
+	}, windows))
+}
 
 func refusedDecision() ratelimit.Decision {
 	return ratelimit.Decision{

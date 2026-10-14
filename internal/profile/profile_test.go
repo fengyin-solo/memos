@@ -42,3 +42,21 @@ func TestValidateRejectsDemoWithNonSQLiteDriver(t *testing.T) {
 	p := &Profile{Demo: true, Driver: "postgres", Data: t.TempDir()}
 	require.ErrorContains(t, p.Validate(), "demo mode requires the sqlite database driver")
 }
+
+func TestValidateRateLimitDriver(t *testing.T) {
+	t.Run("empty defaults to memory", func(t *testing.T) {
+		p := &Profile{Driver: "sqlite", Data: t.TempDir()}
+		require.NoError(t, p.Validate())
+		require.Equal(t, RateLimitDriverMemory, p.RateLimitDriver)
+	})
+	for _, driver := range []string{RateLimitDriverMemory, RateLimitDriverDatabase} {
+		t.Run(driver, func(t *testing.T) {
+			p := &Profile{Driver: "sqlite", Data: t.TempDir(), RateLimitDriver: driver}
+			require.NoError(t, p.Validate())
+		})
+	}
+	t.Run("unknown rejected", func(t *testing.T) {
+		p := &Profile{Driver: "sqlite", Data: t.TempDir(), RateLimitDriver: "redis"}
+		require.ErrorContains(t, p.Validate(), "unsupported rate-limit driver")
+	})
+}

@@ -106,7 +106,7 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		MarkdownService:          markdownService,
 		SSEHub:                   NewSSEHub(),
 		NotificationEmailSender:  nil,
-		RateLimiter:              newProfileRateLimiter(profile),
+		RateLimiter:              newProfileRateLimiter(profile, store),
 		thumbnailSemaphore:       semaphore.NewWeighted(3), // Limit to 3 concurrent thumbnail generations
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
@@ -253,13 +253,30 @@ func setAPIResponseNoStoreHeaders(header http.Header) {
 	header.Set("Expires", "0")
 }
 
-// newProfileRateLimiter builds the default limiter, or nil when the profile
-// turns rate limiting off.
-func newProfileRateLimiter(profile *profile.Profile) ratelimit.Limiter {
-	if !profile.RateLimit {
+// newProfileRateLimiter builds the configured limiter, or nil when the profile
+// turns rate limiting off. The default is the per-process memory limiter;
+// "database" shares one budget across instances through the store.
+func newProfileRateLimiter(p *profile.Profile, windows ratelimit.WindowStore) ratelimit.Limiter {
+	if !p.RateLimit {
 		return nil
 	}
+	if p.RateLimitDriver == profile.RateLimitDriverDatabase {
+		slog.Info("rate limiter uses the shared database backend")
+		return ratelimit.NewStoreBackedLimiter(ratelimit.DefaultPolicy(), windows)
+	}
 	return ratelimit.NewMemoryLimiter(ratelimit.DefaultPolicy())
+}
+
+// rateLimitCloser is implemented by limiters that own background work.
+type rateLimitCloser interface {
+	Close()
+}
+
+// CloseRateLimiter stops background work owned by the active limiter, if any.
+func (s *APIV1Service) CloseRateLimiter() {
+	if closer, ok := s.RateLimiter.(rateLimitCloser); ok {
+		closer.Close()
+	}
 }
 
 // gatewayIncomingHeaderMatcher forwards the challenge token to metadata on top

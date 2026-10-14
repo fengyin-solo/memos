@@ -104,4 +104,12 @@ type Driver interface {
 	CreateUserWithIdentity(ctx context.Context, createUser *User, createIdentity *UserIdentity) (*User, error)
 	ListUserIdentities(ctx context.Context, find *FindUserIdentity) ([]*UserIdentity, error)
 	DeleteUserIdentities(ctx context.Context, delete *DeleteUserIdentity) error
+
+	// RateLimitCounter model related methods. ApplyRateLimitWindow rolls the
+	// counter row for one (scope, key) to the mutation's window and applies
+	// the mutation atomically; it reports the rolled pre-op view and whether
+	// a consume mutation charged. DeleteExpiredRateLimitWindows reaps rows
+	// past their scope-specific cutoff.
+	ApplyRateLimitWindow(ctx context.Context, mutation *RateLimitWindowMutation) (*RateLimitWindow, bool, error)
+	DeleteExpiredRateLimitWindows(ctx context.Context, expiries []RateLimitWindowExpiry) (int64, error)
 }

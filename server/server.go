@@ -150,6 +150,8 @@ func (s *Server) Shutdown(ctx context.Context) {
 	s.closeLongLivedConnections()
 	s.shutdownHTTPServer(ctx)
 	s.apiV1Service.CloseUploads()
+	// Stop the shared limiter's cleanup loop while the database is still open.
+	s.apiV1Service.CloseRateLimiter()
 
 	// Close database connection.
 	if err := s.Store.Close(); err != nil {

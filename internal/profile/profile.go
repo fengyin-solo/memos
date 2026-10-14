@@ -36,10 +36,21 @@ type Profile struct {
 	InstanceURL string
 	// RateLimit enables the request rate limiter. Off restores unbounded behavior.
 	RateLimit bool
+	// RateLimitDriver selects where counters live: RateLimitDriverMemory keeps
+	// them per process (the default), RateLimitDriverDatabase shares one budget
+	// across every instance through the configured database.
+	RateLimitDriver string
 	// TrustedProxies lists the proxies whose forwarding headers identify the
 	// client: CIDRs, addresses, or the keywords "private" and "none".
 	TrustedProxies []string
 }
+
+const (
+	// RateLimitDriverMemory is the default per-process in-memory limiter.
+	RateLimitDriverMemory = "memory"
+	// RateLimitDriverDatabase is the shared, database-backed limiter.
+	RateLimitDriverDatabase = "database"
+)
 
 func checkDataDir(dataDir string) (string, error) {
 	// Convert to absolute path if relative path is supplied.
@@ -111,6 +122,14 @@ func (p *Profile) Validate() error {
 	}
 
 	p.Data = dataDir
+	if p.RateLimitDriver == "" {
+		p.RateLimitDriver = RateLimitDriverMemory
+	}
+	switch p.RateLimitDriver {
+	case RateLimitDriverMemory, RateLimitDriverDatabase:
+	default:
+		return errors.Errorf("unsupported rate-limit driver %q: use %q or %q", p.RateLimitDriver, RateLimitDriverMemory, RateLimitDriverDatabase)
+	}
 	if p.Driver == "sqlite" && p.DSN == "" {
 		mode := "prod"
 		if p.Demo {

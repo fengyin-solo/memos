@@ -151,3 +151,16 @@ CREATE TABLE `user_identity` (
 );
 
 CREATE INDEX `idx_user_identity_user_id` ON `user_identity`(`user_id`);
+
+-- rate_limit_counter
+CREATE TABLE `rate_limit_counter` (
+  `scope`           VARCHAR(64)  NOT NULL,
+  `counter_key`     VARCHAR(255) NOT NULL,
+  `window_start_ts` BIGINT       NOT NULL,
+  `current_count`   INT          NOT NULL DEFAULT 0 CHECK (`current_count` >= 0),
+  `previous_count`  INT          NOT NULL DEFAULT 0 CHECK (`previous_count` >= 0),
+  `updated_ts`      BIGINT       NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  PRIMARY KEY (`scope`, `counter_key`)
+);
+
+CREATE INDEX `idx_rate_limit_counter_window_start_ts` ON `rate_limit_counter`(`window_start_ts`);
