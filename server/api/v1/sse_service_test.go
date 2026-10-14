@@ -30,7 +30,11 @@ func newIntegrationService(t *testing.T) *APIV1Service {
 	st := teststore.NewTestingStore(ctx, t)
 	t.Cleanup(func() { st.Close() })
 	p := &profile.Profile{Demo: true, Data: t.TempDir(), Driver: "sqlite", DSN: ":memory:"}
-	return NewAPIV1Service("test-secret", p, st)
+	service := NewAPIV1Service("test-secret", p, st)
+	// Cleanups run LIFO: stop the webhook delivery workers before the store closes.
+	service.StartWebhookDeliveryWorkers(ctx)
+	t.Cleanup(func() { service.ShutdownWebhookDeliveryWorkers(context.Background()) })
+	return service
 }
 
 // userCtx returns a context that authenticates as the given user.

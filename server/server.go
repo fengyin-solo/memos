@@ -138,6 +138,11 @@ func (s *Server) Start() error {
 		}
 	}()
 
+	// Start the persistent outbound webhook delivery workers. Pending rows
+	// from a previous process are claimed here as soon as their backoff and
+	// claim leases allow.
+	s.apiV1Service.StartWebhookDeliveryWorkers(context.Background())
+
 	return nil
 }
 
@@ -149,6 +154,7 @@ func (s *Server) Shutdown(ctx context.Context) {
 
 	s.closeLongLivedConnections()
 	s.shutdownHTTPServer(ctx)
+	s.apiV1Service.ShutdownWebhookDeliveryWorkers(ctx)
 	s.apiV1Service.CloseUploads()
 
 	// Close database connection.

@@ -13,6 +13,7 @@ import (
 	"sync"
 	"sync/atomic"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/require"
 )
@@ -163,10 +164,136 @@ func TestPostAllowsExplicitPrivateIPPolicyAtDialTime(t *testing.T) {
 	}
 }
 
-func TestPostAsyncNilPayloadDoesNotPanic(t *testing.T) {
-	require.NotPanics(t, func() {
-		PostAsync(nil)
+// TestDeliverClassifiesResponses verifies the retry/non-retry verdict the
+// persistent queue relies on: explicit 4xx are permanent, 5xx and 429 are
+// retryable, and transport failures are retryable while SSRF rejections are not.
+func TestDeliverClassifiesResponses(t *testing.T) {
+	prev := AllowPrivateIPs
+	AllowPrivateIPs = true
+	defer func() { AllowPrivateIPs = prev }()
+
+	newStatusServer := func(statusCode int) *httptest.Server {
+		return httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			w.WriteHeader(statusCode)
+			_, _ = w.Write([]byte(`{"code":0}`))
+		}))
+	}
+
+	t.Run("2xx succeeds", func(t *testing.T) {
+		server := newStatusServer(http.StatusOK)
+		defer server.Close()
+		result, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.NoError(t, err)
+		require.False(t, retryable)
+		require.Equal(t, http.StatusOK, result.StatusCode)
 	})
+
+	t.Run("404 is a non-retryable failure", func(t *testing.T) {
+		server := newStatusServer(http.StatusNotFound)
+		defer server.Close()
+		result, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.False(t, retryable)
+		require.Equal(t, http.StatusNotFound, result.StatusCode)
+	})
+
+	t.Run("400 is a non-retryable failure", func(t *testing.T) {
+		server := newStatusServer(http.StatusBadRequest)
+		defer server.Close()
+		_, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.False(t, retryable)
+	})
+
+	t.Run("500 is retryable", func(t *testing.T) {
+		server := newStatusServer(http.StatusInternalServerError)
+		defer server.Close()
+		result, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.True(t, retryable)
+		require.Equal(t, http.StatusInternalServerError, result.StatusCode)
+	})
+
+	t.Run("429 is retryable", func(t *testing.T) {
+		server := newStatusServer(http.StatusTooManyRequests)
+		defer server.Close()
+		_, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.True(t, retryable)
+	})
+
+	t.Run("408 is retryable", func(t *testing.T) {
+		server := newStatusServer(http.StatusRequestTimeout)
+		defer server.Close()
+		_, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.True(t, retryable)
+	})
+
+	t.Run("connection refused is retryable", func(t *testing.T) {
+		server := newStatusServer(http.StatusOK)
+		url := server.URL
+		server.Close()
+		result, retryable, err := Deliver(context.Background(), &Request{URL: url})
+		require.Error(t, err)
+		require.True(t, retryable)
+		require.Nil(t, result)
+	})
+
+	t.Run("timeout is retryable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			time.Sleep(2 * time.Second)
+			_, _ = w.Write([]byte(`{"code":0}`))
+		}))
+		defer server.Close()
+		ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+		defer cancel()
+		_, retryable, err := Deliver(ctx, &Request{URL: server.URL})
+		require.Error(t, err)
+		require.True(t, retryable)
+	})
+
+	t.Run("2xx application error is non-retryable", func(t *testing.T) {
+		server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+			_, _ = w.Write([]byte(`{"code":42,"message":"bad payload"}`))
+		}))
+		defer server.Close()
+		_, retryable, err := Deliver(context.Background(), &Request{URL: server.URL})
+		require.Error(t, err)
+		require.False(t, retryable)
+	})
+}
+
+// TestDeliverSSRFRejectionIsNonRetryable pins that a blocked destination ends
+// the delivery as a permanent failure instead of burning the retry budget.
+func TestDeliverSSRFRejectionIsNonRetryable(t *testing.T) {
+	resetPrivateDestinationPolicy(t)
+	_, retryable, err := Deliver(context.Background(), &Request{URL: "http://127.0.0.1:9/hook"})
+	require.Error(t, err)
+	require.False(t, retryable)
+}
+
+// TestDeliverReusesMessageID verifies retries carrying the same Request.MessageID
+// send the same webhook-id, which lets receivers deduplicate redeliveries.
+func TestDeliverReusesMessageID(t *testing.T) {
+	prev := AllowPrivateIPs
+	AllowPrivateIPs = true
+	defer func() { AllowPrivateIPs = prev }()
+
+	messageIDs := make(chan string, 2)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		messageIDs <- r.Header.Get("webhook-id")
+		_, _ = w.Write([]byte(`{"code":0}`))
+	}))
+	defer server.Close()
+
+	request := &Request{URL: server.URL, SigningSecret: "secret", MessageID: "msg_fixed-id"}
+	for range 2 {
+		_, _, err := Deliver(context.Background(), request)
+		require.NoError(t, err)
+	}
+	require.Equal(t, "msg_fixed-id", <-messageIDs)
+	require.Equal(t, "msg_fixed-id", <-messageIDs)
 }
 
 func TestResolveSigningKey(t *testing.T) {

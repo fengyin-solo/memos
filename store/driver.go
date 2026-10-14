@@ -104,4 +104,12 @@ type Driver interface {
 	CreateUserWithIdentity(ctx context.Context, createUser *User, createIdentity *UserIdentity) (*User, error)
 	ListUserIdentities(ctx context.Context, find *FindUserIdentity) ([]*UserIdentity, error)
 	DeleteUserIdentities(ctx context.Context, delete *DeleteUserIdentity) error
+
+	// WebhookDelivery model related methods. The persistent outbound webhook
+	// queue survives restarts and deduplicates by idempotency key.
+	CreateWebhookDelivery(ctx context.Context, create *CreateWebhookDelivery) (*WebhookDelivery, bool, error)
+	ListWebhookDeliveries(ctx context.Context, find *FindWebhookDelivery) ([]*WebhookDelivery, error)
+	ClaimDueWebhookDeliveries(ctx context.Context, limit int, nowTs int64, staleBeforeTs int64, workerID string) ([]*WebhookDelivery, error)
+	CompleteWebhookDelivery(ctx context.Context, complete *CompleteWebhookDelivery) error
+	CountWebhookDeliveriesGrouped(ctx context.Context, webhookID *string) ([]*WebhookDeliveryCount, error)
 }

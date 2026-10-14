@@ -2,16 +2,18 @@ package v1
 
 import (
 	"context"
+	"fmt"
+	"strings"
 
 	"github.com/pkg/errors"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 
 	"github.com/usememos/memos/core/access"
-	"github.com/usememos/memos/internal/webhook"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	"github.com/usememos/memos/server/auth"
+	"github.com/usememos/memos/server/webhookdelivery"
 	"github.com/usememos/memos/store"
 )
 
@@ -78,7 +80,9 @@ func (s *APIV1Service) DispatchMemoCommentCreatedWebhook(
 		return err
 	}
 	for _, hook := range webhooks {
-		webhook.PostAsync(newMemoWebhookRequest(hook, "memos.memo.comment.created", commentMessage))
+		if err := s.enqueueMemoWebhook(ctx, hook, relatedMemoCreatorID, "memos.memo.comment.created", commentMessage); err != nil {
+			return err
+		}
 	}
 	return nil
 }
@@ -97,9 +101,53 @@ func (s *APIV1Service) dispatchMemoRelatedWebhook(ctx context.Context, memo *v1p
 		return err
 	}
 	for _, hook := range webhooks {
-		webhook.PostAsync(newMemoWebhookRequest(hook, activityType, memo))
+		if err := s.enqueueMemoWebhook(ctx, hook, creatorID, activityType, memo); err != nil {
+			return err
+		}
 	}
 	return nil
+}
+
+// enqueueMemoWebhook persists one memo activity delivery for one configured
+// webhook. The event key is deterministic from (activity, memo revision), so a
+// repeated trigger of the same event collapses onto the existing delivery
+// instead of being delivered twice.
+func (s *APIV1Service) enqueueMemoWebhook(ctx context.Context, hook *storepb.WebhooksUserSetting_Webhook, creatorID int32, activityType string, memo *v1pb.Memo) error {
+	if s.WebhookQueue == nil {
+		return nil
+	}
+	_, _, err := s.WebhookQueue.Enqueue(ctx, &webhookdelivery.EnqueueRequest{
+		EventKey:      memoWebhookEventKey(activityType, memo),
+		WebhookID:     hook.Id,
+		UserID:        creatorID,
+		URL:           hook.Url,
+		Label:         activityType,
+		SigningSecret: hook.SigningSecret,
+		Payload: &memoWebhookPayload{
+			URL:          hook.Url,
+			ActivityType: activityType,
+			Creator:      memo.Creator,
+			Memo:         memo,
+		},
+	})
+	return err
+}
+
+// memoWebhookEventKey derives the deterministic logical-event identity. Create
+// events key on the creation timestamp; updates, deletes, and comments on the
+// last update timestamp, so distinct revisions produce distinct events while
+// the same event fired twice produces only one delivery. Nanosecond precision
+// keeps two operations landing in the same second from collapsing together.
+func memoWebhookEventKey(activityType string, memo *v1pb.Memo) string {
+	var eventTs int64
+	if strings.HasSuffix(activityType, ".created") {
+		if memo.CreateTime != nil {
+			eventTs = memo.CreateTime.AsTime().UnixNano()
+		}
+	} else if memo.UpdateTime != nil {
+		eventTs = memo.UpdateTime.AsTime().UnixNano()
+	}
+	return fmt.Sprintf("%s|%s|%d", activityType, memo.Name, eventTs)
 }
 
 // memoWebhookPayload is the JSON body delivered to user webhooks for memo
@@ -113,20 +161,6 @@ type memoWebhookPayload struct {
 	Creator string `json:"creator"`
 	// Memo is the memo that triggered the event.
 	Memo *v1pb.Memo `json:"memo"`
-}
-
-func newMemoWebhookRequest(hook *storepb.WebhooksUserSetting_Webhook, activityType string, memo *v1pb.Memo) *webhook.Request {
-	return &webhook.Request{
-		URL:           hook.Url,
-		Label:         activityType,
-		SigningSecret: hook.SigningSecret,
-		Payload: &memoWebhookPayload{
-			URL:          hook.Url,
-			ActivityType: activityType,
-			Creator:      memo.Creator,
-			Memo:         memo,
-		},
-	}
 }
 
 func (s *APIV1Service) getMemoContentSnippet(content string) (string, error) {

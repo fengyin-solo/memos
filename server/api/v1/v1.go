@@ -21,6 +21,7 @@ import (
 	"github.com/usememos/memos/markdown"
 	v1pb "github.com/usememos/memos/proto/gen/api/v1"
 	"github.com/usememos/memos/server/auth"
+	"github.com/usememos/memos/server/webhookdelivery"
 	"github.com/usememos/memos/store"
 )
 
@@ -71,6 +72,10 @@ type APIV1Service struct {
 	MarkdownService         markdown.Service
 	SSEHub                  *SSEHub
 	NotificationEmailSender notification.EmailSender
+	// WebhookQueue persists outbound webhook deliveries and retries them with
+	// exponential backoff. It is nil only in tests that construct the service
+	// struct directly; dispatch code treats that as a no-op.
+	WebhookQueue *webhookdelivery.Queue
 
 	// RateLimiter bounds request rates; nil disables every limit.
 	RateLimiter ratelimit.Limiter
@@ -111,7 +116,25 @@ func NewAPIV1Service(secret string, profile *profile.Profile, store *store.Store
 		imageProcessingSemaphore: semaphore.NewWeighted(2),
 	}
 	service.linkMetadataFetcher = linkmeta.NewHTMLMetaFetcher()
+	service.WebhookQueue = webhookdelivery.New(store)
 	return service
+}
+
+// StartWebhookDeliveryWorkers starts the background workers that drain the
+// persistent webhook queue.
+func (s *APIV1Service) StartWebhookDeliveryWorkers(ctx context.Context) {
+	if s.WebhookQueue != nil {
+		s.WebhookQueue.Start(ctx)
+	}
+}
+
+// ShutdownWebhookDeliveryWorkers stops the background webhook workers.
+func (s *APIV1Service) ShutdownWebhookDeliveryWorkers(ctx context.Context) {
+	if s.WebhookQueue != nil {
+		if err := s.WebhookQueue.Shutdown(ctx); err != nil {
+			slog.Warn("webhook delivery workers did not stop cleanly", slog.Any("err", err))
+		}
+	}
 }
 
 // newGatewayMarshaler mirrors grpc-gateway's default JSON marshaler with one
@@ -217,6 +240,8 @@ func (s *APIV1Service) RegisterGateway(ctx context.Context, echoServer *echo.Ech
 	gwGroup := echoServer.Group("")
 	// Register SSE endpoint with same CORS as rest of /api/v1.
 	RegisterSSERoutes(gwGroup, s.SSEHub, s.Store, s.Secret)
+	// Administrator-only persistent webhook delivery observability and replay.
+	RegisterWebhookDeliveryRoutes(gwGroup, s.Store, s.Secret, s.WebhookQueue)
 	handler := echo.WrapHandler(gwMux)
 
 	gwGroup.Any("/api/v1/*", handler)

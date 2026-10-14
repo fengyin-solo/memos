@@ -151,3 +151,29 @@ CREATE TABLE `user_identity` (
 );
 
 CREATE INDEX `idx_user_identity_user_id` ON `user_identity`(`user_id`);
+
+-- persistent outbound webhook delivery queue
+CREATE TABLE `webhook_delivery` (
+  `id` BIGINT NOT NULL AUTO_INCREMENT PRIMARY KEY,
+  `created_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `updated_ts` BIGINT NOT NULL DEFAULT (UNIX_TIMESTAMP()),
+  `idempotency_key` VARCHAR(128) NOT NULL,
+  `webhook_id` VARCHAR(64) NOT NULL DEFAULT '',
+  `user_id` INT NOT NULL DEFAULT 0,
+  `url` TEXT NOT NULL,
+  `label` VARCHAR(128) NOT NULL DEFAULT '',
+  `signing_secret` TEXT NOT NULL,
+  `payload` MEDIUMTEXT NOT NULL,
+  `message_id` VARCHAR(128) NOT NULL DEFAULT '',
+  `status` VARCHAR(16) NOT NULL DEFAULT 'PENDING',
+  `attempts` INT NOT NULL DEFAULT 0,
+  `max_attempts` INT NOT NULL DEFAULT 5,
+  `next_attempt_ts` BIGINT NOT NULL DEFAULT 0,
+  `claimed_by` VARCHAR(128) NOT NULL DEFAULT '',
+  `last_status_code` INT NOT NULL DEFAULT 0,
+  `last_error` TEXT NOT NULL,
+  `succeeded_ts` BIGINT NOT NULL DEFAULT 0,
+  UNIQUE INDEX `idx_webhook_delivery_idempotency_key` (`idempotency_key`),
+  INDEX `idx_webhook_delivery_claim` (`status`, `next_attempt_ts`, `updated_ts`),
+  INDEX `idx_webhook_delivery_webhook_id` (`webhook_id`)
+);

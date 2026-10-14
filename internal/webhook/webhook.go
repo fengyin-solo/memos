@@ -9,7 +9,6 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/netip"
@@ -34,24 +33,7 @@ var (
 			DialContext: safeDialContext,
 		},
 	}
-
-	asyncPostQueue = make(chan *Request, 128)
 )
-
-func init() {
-	for range 4 {
-		go func() {
-			for request := range asyncPostQueue {
-				if err := Post(request); err != nil {
-					slog.Warn("Failed to dispatch webhook asynchronously",
-						slog.String("url", request.URL),
-						slog.String("label", request.Label),
-						slog.Any("err", err))
-				}
-			}
-		}()
-	}
-}
 
 // safeDialContext is a net.Dialer.DialContext replacement that resolves the target
 // hostname, rejects disallowed reserved/private addresses, and dials an already
@@ -108,6 +90,42 @@ type Request struct {
 	SigningSecret string
 	// Payload is the value encoded as the JSON request body.
 	Payload any
+	// MessageID, when set, is sent as the Standard Webhooks webhook-id header.
+	// The persistent queue sets it once per logical delivery and reuses it across
+	// retries so receivers can deduplicate redeliveries. When empty, Deliver
+	// generates a fresh id for the attempt.
+	MessageID string
+}
+
+// AttemptResult describes the HTTP response of one send attempt.
+type AttemptResult struct {
+	// StatusCode is the HTTP status code, or 0 when the request never reached
+	// the receiver (DNS, dial, timeout, or transport error).
+	StatusCode int
+}
+
+// statusCodeRetryable reports whether an HTTP status warrants another attempt.
+// 5xx responses are transient server failures. 408 (request timeout) and 429
+// (rate limited) are explicit 4xx codes whose semantics demand a retry; every
+// other 4xx is a definitive rejection that retrying cannot fix.
+func statusCodeRetryable(statusCode int) bool {
+	if statusCode >= 500 && statusCode <= 599 {
+		return true
+	}
+	return statusCode == http.StatusRequestTimeout || statusCode == http.StatusTooManyRequests
+}
+
+// transportErrorRetryable classifies a failed http.Client.Do. Timeouts, DNS
+// failures, refused/reset connections and shutdown cancellations may clear on
+// their own; an SSRF rejection is configuration, so retrying cannot help.
+func transportErrorRetryable(err error) bool {
+	if err == nil {
+		return false
+	}
+	if strings.Contains(err.Error(), "reserved/private IP address is not allowed") {
+		return false
+	}
+	return true
 }
 
 // resolveSigningKey returns the raw HMAC key for a signing secret. Secrets using
@@ -137,16 +155,23 @@ func GenerateSigningSecret() (string, error) {
 	return "whsec_" + base64.StdEncoding.EncodeToString(buf), nil
 }
 
-// Post delivers the request synchronously and returns the receiver's verdict.
-func Post(requestPayload *Request) error {
+// Deliver performs one signed delivery attempt and classifies the outcome.
+//
+// A nil error means the receiver accepted the delivery. A non-nil error carries
+// the retryable verdict: true for timeouts, transport failures and 5xx/408/429
+// responses where another attempt may succeed; false for definitive failures
+// such as an SSRF rejection, an invalid signing secret, and explicit 4xx
+// responses. The returned *AttemptResult is nil when no HTTP response was
+// received.
+func Deliver(ctx context.Context, requestPayload *Request) (*AttemptResult, bool, error) {
 	body, err := json.Marshal(requestPayload.Payload)
 	if err != nil {
-		return errors.Wrapf(err, "failed to marshal webhook request to %s", requestPayload.URL)
+		return nil, false, errors.Wrapf(err, "failed to marshal webhook request to %s", requestPayload.URL)
 	}
 
-	req, err := http.NewRequest("POST", requestPayload.URL, bytes.NewBuffer(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, requestPayload.URL, bytes.NewBuffer(body))
 	if err != nil {
-		return errors.Wrapf(err, "failed to construct webhook request to %s", requestPayload.URL)
+		return nil, false, errors.Wrapf(err, "failed to construct webhook request to %s", requestPayload.URL)
 	}
 
 	req.Header.Set("Content-Type", "application/json")
@@ -154,64 +179,63 @@ func Post(requestPayload *Request) error {
 	if requestPayload.SigningSecret != "" {
 		key, err := resolveSigningKey(requestPayload.SigningSecret)
 		if err != nil {
-			return errors.Wrapf(err, "failed to derive signing key for webhook to %s", requestPayload.URL)
+			return nil, false, errors.Wrapf(err, "failed to derive signing key for webhook to %s", requestPayload.URL)
 		}
 
-		msgID := "msg_" + uuid.NewV4().String()
+		messageID := requestPayload.MessageID
+		if messageID == "" {
+			messageID = "msg_" + uuid.NewV4().String()
+		}
 		timestamp := strconv.FormatInt(time.Now().Unix(), 10)
 
 		mac := hmac.New(sha256.New, key)
-		mac.Write([]byte(msgID + "." + timestamp + "."))
+		mac.Write([]byte(messageID + "." + timestamp + "."))
 		mac.Write(body)
 		signature := base64.StdEncoding.EncodeToString(mac.Sum(nil))
 
-		req.Header.Set("webhook-id", msgID)
+		req.Header.Set("webhook-id", messageID)
 		req.Header.Set("webhook-timestamp", timestamp)
 		req.Header.Set("webhook-signature", "v1,"+signature)
 	}
 
 	resp, err := safeClient.Do(req)
 	if err != nil {
-		return errors.Wrapf(err, "failed to post webhook to %s", requestPayload.URL)
+		return nil, transportErrorRetryable(err), errors.Wrapf(err, "failed to post webhook to %s", requestPayload.URL)
 	}
 	defer resp.Body.Close()
 
-	b, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
+	result := &AttemptResult{StatusCode: resp.StatusCode}
+
+	responseBody, err := io.ReadAll(io.LimitReader(resp.Body, 1<<20))
 	if err != nil {
-		return errors.Wrapf(err, "failed to read webhook response from %s", requestPayload.URL)
+		return result, true, errors.Wrapf(err, "failed to read webhook response from %s", requestPayload.URL)
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return errors.Errorf("failed to post webhook %s, status code: %d", requestPayload.URL, resp.StatusCode)
+		if statusCodeRetryable(resp.StatusCode) {
+			return result, true, errors.Errorf("webhook to %s returned retryable status code: %d", requestPayload.URL, resp.StatusCode)
+		}
+		return result, false, errors.Errorf("webhook to %s returned non-retryable status code: %d", requestPayload.URL, resp.StatusCode)
 	}
 
 	response := &struct {
 		Code    int    `json:"code"`
 		Message string `json:"message"`
 	}{}
-	if err := json.Unmarshal(b, response); err != nil {
-		return errors.Wrapf(err, "failed to unmarshal webhook response from %s", requestPayload.URL)
+	if err := json.Unmarshal(responseBody, response); err != nil {
+		return result, false, errors.Wrapf(err, "failed to unmarshal webhook response from %s", requestPayload.URL)
 	}
 
 	if response.Code != 0 {
-		return errors.Errorf("receive error code sent by webhook server, code %d, msg: %s", response.Code, response.Message)
+		return result, false, errors.Errorf("receive error code sent by webhook server, code %d, msg: %s", response.Code, response.Message)
 	}
 
-	return nil
+	return result, false, nil
 }
 
-// PostAsync enqueues the request for bounded asynchronous delivery and does
-// not wait for the response.
-func PostAsync(requestPayload *Request) {
-	if requestPayload == nil {
-		slog.Warn("Dropped webhook dispatch because request is nil")
-		return
-	}
-	select {
-	case asyncPostQueue <- requestPayload:
-	default:
-		slog.Warn("Dropped webhook dispatch because the async queue is full",
-			slog.String("url", requestPayload.URL),
-			slog.String("label", requestPayload.Label))
-	}
+// Post delivers the request synchronously and returns the receiver's verdict.
+// It is a thin compatibility wrapper over Deliver using the background context.
+func Post(requestPayload *Request) error {
+	_, _, err := Deliver(context.Background(), requestPayload)
+	return err
 }
