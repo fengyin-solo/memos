@@ -32,6 +32,7 @@ import (
 	storepb "github.com/usememos/memos/proto/gen/store"
 	apiv1service "github.com/usememos/memos/server/api/v1"
 	"github.com/usememos/memos/server/auth"
+	servercleanup "github.com/usememos/memos/server/objectcleanup"
 	"github.com/usememos/memos/store"
 	"github.com/usememos/memos/store/db"
 	teststore "github.com/usememos/memos/store/test"
@@ -983,6 +984,9 @@ func TestDeleteAttachmentRemovesCachedThumbnail(t *testing.T) {
 	ownerCtx := context.WithValue(ctx, auth.UserIDContextKey, owner.ID)
 	_, err = svc.DeleteAttachment(ownerCtx, &apiv1.DeleteAttachmentRequest{Name: attachment.Name})
 	require.NoError(t, err)
+	// Thumbnail removal now happens asynchronously via the cleanup ledger.
+	worker := servercleanup.New(svc.Store, fs.Profile, servercleanup.WithWorkerID("fileserver-test"))
+	require.NoError(t, worker.RunOnce(ctx))
 	require.NoFileExists(t, thumbnailPath)
 }
 

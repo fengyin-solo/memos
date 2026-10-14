@@ -25,7 +25,7 @@ func (d *DB) DeleteSpace(ctx context.Context, delete *store.DeleteSpace) (*store
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to collect assigned memos")
 	}
-	attachments, err := deleteSQLiteMemoSetTx(ctx, tx, memoIDs)
+	attachments, err := deleteSQLiteMemoSetTx(ctx, tx, memoIDs, store.StorageCleanupSourceSpace)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to delete assigned memo set")
 	}
@@ -91,10 +91,13 @@ func listSQLiteSpaceDeleteMemoIDs(ctx context.Context, tx dbExecutor, spaceID in
 	return ids, rows.Err()
 }
 
-func deleteSQLiteMemoSetTx(ctx context.Context, tx dbExecutor, memoIDs []int32) ([]*store.Attachment, error) {
+func deleteSQLiteMemoSetTx(ctx context.Context, tx dbExecutor, memoIDs []int32, source store.StorageCleanupSource) ([]*store.Attachment, error) {
 	attachments, err := listSQLiteMemoSetAttachments(ctx, tx, memoIDs)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to collect memo attachments")
+	}
+	if err := insertSQLiteStorageCleanupTasksTx(ctx, tx, store.BuildStorageCleanupTasks(attachments, source)); err != nil {
+		return nil, errors.Wrap(err, "failed to enqueue memo attachment cleanup")
 	}
 	if err := deleteSQLiteMemoSetShares(ctx, tx, memoIDs); err != nil {
 		return nil, errors.Wrap(err, "failed to delete memo shares")

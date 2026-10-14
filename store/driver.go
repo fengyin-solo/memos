@@ -28,6 +28,14 @@ type Driver interface {
 	DeleteAttachmentsWithPolicy(ctx context.Context, policy *AttachmentDeletionPolicy, attachmentIDs []int32) error
 	ApplyMemoMutation(ctx context.Context, mutation *MemoMutation) error
 
+	// StorageCleanupTask model related methods.
+	InsertStorageCleanupTasks(ctx context.Context, tasks []*StorageCleanupTask) error
+	ClaimStorageCleanupTasks(ctx context.Context, nowTs, leaseExpiresTs int64, workerID string, batchSize int) ([]*StorageCleanupTask, error)
+	FinishStorageCleanupTask(ctx context.Context, update *StorageCleanupTaskUpdate) (bool, error)
+	GetStorageCleanupStats(ctx context.Context) ([]*StorageCleanupSourceStats, error)
+	ListStorageCleanupTasks(ctx context.Context, afterID int64, limit int) ([]*StorageCleanupTask, error)
+	ListAttachmentStorageRefs(ctx context.Context) ([]*StorageObjectRef, error)
+
 	// Memo model related methods.
 	CreateMemo(ctx context.Context, create *Memo) (*Memo, error)
 	ListMemos(ctx context.Context, find *FindMemo) ([]*Memo, error)

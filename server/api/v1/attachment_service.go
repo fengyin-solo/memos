@@ -609,10 +609,17 @@ func (s *APIV1Service) deleteAttachmentsAtomically(ctx context.Context, user *st
 	if attachmentsIncludeMemo(attachments) {
 		s.SSEHub.publishMemoChanged()
 	}
-	if err := s.cleanupDeletedAttachmentStorage(ctx, attachments); err != nil {
-		return status.Errorf(codes.Internal, "attachments were deleted but storage cleanup failed: %v", err)
-	}
+	// External objects are removed by the storage cleanup worker from the
+	// ledger rows written in the deletion transaction; storage failures never
+	// fail the already-committed deletion.
+	s.notifyStorageCleanup()
 	return nil
+}
+
+func (s *APIV1Service) notifyStorageCleanup() {
+	if s.StorageCleanupNotifier != nil {
+		s.StorageCleanupNotifier()
+	}
 }
 
 func attachmentsIncludeMemo(attachments []*store.Attachment) bool {

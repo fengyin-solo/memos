@@ -236,7 +236,7 @@ func TestMemoManagedAttachmentImages(t *testing.T) {
 		require.Nil(t, stored)
 	})
 
-	t.Run("local deletion failure reports committed row deletion", func(t *testing.T) {
+	t.Run("local deletion is retried from the cleanup ledger", func(t *testing.T) {
 		ts := NewTestService(t)
 		defer ts.Cleanup()
 		user, err := ts.CreateRegularUser(ctx, "managed-delete-retry")
@@ -260,21 +260,28 @@ func TestMemoManagedAttachmentImages(t *testing.T) {
 			"LOCAL", localReference, storedImage.ID,
 		)
 		require.NoError(t, err)
-		_, err = ts.Service.UpdateMemo(store.WithDeleteAttachmentStorageFailpoint(userCtx), &v1pb.UpdateMemoRequest{
+		_, err = ts.Service.UpdateMemo(userCtx, &v1pb.UpdateMemoRequest{
 			Memo:       &v1pb.Memo{Name: memo.Name, Content: "attachment removed", Attachments: []*v1pb.Attachment{}},
 			UpdateMask: &fieldmaskpb.FieldMask{Paths: []string{"content", "attachments"}},
 		})
-		require.Equal(t, codes.Internal, status.Code(err))
-		require.ErrorContains(t, err, "memo was updated but attachment storage cleanup failed")
-		require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+		require.NoError(t, err, "storage failures no longer fail the committed memo update")
 		storedMemo, getErr := ts.Service.GetMemo(userCtx, &v1pb.GetMemoRequest{Name: memo.Name})
 		require.NoError(t, getErr)
 		require.Equal(t, "attachment removed", storedMemo.Content)
 		storedImage, getErr = ts.Store.GetAttachment(ctx, &store.FindAttachment{UID: &uid})
 		require.NoError(t, getErr)
 		require.Nil(t, storedImage)
-		_, statErr := os.Stat(localPath)
-		require.NoError(t, statErr)
+		require.FileExists(t, localPath)
+		requireStorageCleanupTask(t, ts, localReference, store.StorageCleanupStatusPending)
+
+		ts.RunStorageCleanupWorkerCtx(t, store.WithDeleteAttachmentStorageFailpoint(ctx))
+		require.FileExists(t, localPath)
+		task := requireStorageCleanupTask(t, ts, localReference, store.StorageCleanupStatusPending)
+		require.NotEmpty(t, task.LastError)
+
+		ts.RunStorageCleanupWorker(t)
+		requireStorageCleanupTask(t, ts, localReference, store.StorageCleanupStatusSucceeded)
+		require.NoFileExists(t, localPath)
 	})
 
 	t.Run("failed content validation does not mutate the memo", func(t *testing.T) {

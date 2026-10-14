@@ -30,6 +30,10 @@ type Driver interface {
 	// most one range because S3 does not support multipart range responses.
 	GetObjectStream(ctx context.Context, key string, byteRange string) (*ObjectStream, error)
 	DeleteObject(ctx context.Context, key string) error
+	// ListObjectKeys enumerates every object key in the configured bucket or
+	// container. Read-only reconciliation uses it to detect objects absent
+	// from both the attachment table and the cleanup ledger.
+	ListObjectKeys(ctx context.Context) ([]string, error)
 }
 
 // NewDriver creates the driver for a configured storage.

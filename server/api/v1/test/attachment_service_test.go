@@ -831,7 +831,7 @@ func TestBatchDeleteAttachments(t *testing.T) {
 	})
 }
 
-func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing.T) {
+func TestBatchDeleteAttachmentsDefersStorageCleanupToLedger(t *testing.T) {
 	ts := NewTestService(t)
 	defer ts.Cleanup()
 	ctx := context.Background()
@@ -856,6 +856,7 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 	require.NoError(t, err)
 
 	localPaths := make([]string, 0, len(attachments))
+	references := make([]string, 0, len(attachments))
 	for index, attachment := range attachments {
 		uid, err := apiv1.ExtractAttachmentUIDFromName(attachment.Name)
 		require.NoError(t, err)
@@ -867,17 +868,18 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 		require.NoError(t, os.WriteFile(path, []byte(attachment.Filename), 0o600))
 		_, err = ts.Store.GetDriver().GetDB().ExecContext(ctx,
 			"UPDATE attachment SET storage_type = ?, reference = ? WHERE id = ?",
-			"LOCAL", reference, stored.ID,
+			"LOCAL", filepath.ToSlash(reference), stored.ID,
 		)
 		require.NoError(t, err, "attachment %d", index)
 		localPaths = append(localPaths, path)
+		references = append(references, filepath.ToSlash(reference))
 	}
 
+	// The committed deletion never reports storage failures: cleanup is
+	// retried asynchronously from ledger rows.
 	names := []string{attachments[0].Name, attachments[1].Name}
-	_, err = ts.Service.BatchDeleteAttachments(store.WithDeleteAttachmentStorageFailpoint(userCtx), &v1pb.BatchDeleteAttachmentsRequest{Names: names})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "attachments were deleted but storage cleanup failed")
-	require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+	_, err = ts.Service.BatchDeleteAttachments(userCtx, &v1pb.BatchDeleteAttachmentsRequest{Names: names})
+	require.NoError(t, err)
 	for _, attachment := range attachments {
 		uid, err := apiv1.ExtractAttachmentUIDFromName(attachment.Name)
 		require.NoError(t, err)
@@ -890,7 +892,51 @@ func TestBatchDeleteAttachmentsReportsPostCommitStorageCleanupFailure(t *testing
 	require.Empty(t, listed.Attachments)
 	for _, path := range localPaths {
 		_, err := os.Stat(path)
-		require.NoError(t, err, "storage cleanup failure happens after the database deletion commits")
+		require.NoError(t, err, "objects survive until the cleanup worker runs")
+	}
+	for _, reference := range references {
+		requireStorageCleanupTask(t, ts, reference, store.StorageCleanupStatusPending)
+	}
+
+	// A failing attempt keeps the rows retryable and the objects in place.
+	ts.RunStorageCleanupWorkerCtx(t, store.WithDeleteAttachmentStorageFailpoint(ctx))
+	for _, path := range localPaths {
+		_, err := os.Stat(path)
+		require.NoError(t, err)
+	}
+	for _, reference := range references {
+		task := requireStorageCleanupTask(t, ts, reference, store.StorageCleanupStatusPending)
+		require.NotEmpty(t, task.LastError)
+	}
+
+	ts.RunStorageCleanupWorker(t)
+	for _, reference := range references {
+		requireStorageCleanupTask(t, ts, reference, store.StorageCleanupStatusSucceeded)
+	}
+	for _, path := range localPaths {
+		_, err := os.Stat(path)
+		require.ErrorIs(t, err, os.ErrNotExist)
+	}
+}
+
+// requireStorageCleanupTask loads the ledger task for key and asserts status.
+func requireStorageCleanupTask(t *testing.T, ts *TestService, key string, status store.StorageCleanupStatus) *store.StorageCleanupTask {
+	t.Helper()
+	ctx := context.Background()
+	var afterID int64
+	for {
+		tasks, err := ts.Store.ListStorageCleanupTasks(ctx, afterID, 1000)
+		require.NoError(t, err)
+		if len(tasks) == 0 {
+			t.Fatalf("cleanup task %q not found", key)
+		}
+		for _, task := range tasks {
+			if task.StorageKey == key {
+				require.Equal(t, status, task.Status)
+				return task
+			}
+		}
+		afterID = tasks[len(tasks)-1].ID
 	}
 }
 

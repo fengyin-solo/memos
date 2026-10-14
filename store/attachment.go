@@ -190,6 +190,8 @@ func (s *Store) UpdateAttachment(ctx context.Context, update *UpdateAttachment) 
 	return s.driver.UpdateAttachment(ctx, update)
 }
 
+// DeleteAttachment removes the attachment row and enqueues its external
+// object for asynchronous cleanup by the storage cleanup worker.
 func (s *Store) DeleteAttachment(ctx context.Context, delete *DeleteAttachment) error {
 	attachment, err := s.GetAttachment(ctx, &FindAttachment{ID: &delete.ID})
 	if err != nil {
@@ -199,16 +201,15 @@ func (s *Store) DeleteAttachment(ctx context.Context, delete *DeleteAttachment) 
 		return errors.New("attachment not found")
 	}
 
-	if err := s.DeleteAttachmentStorage(ctx, attachment); err != nil {
-		if attachment.StorageType == storepb.AttachmentStorageType_LOCAL {
-			return errors.Wrap(err, "failed to delete local file")
-		}
-		slog.Warn("Failed to delete attachment storage", slog.Any("err", err))
+	if err := s.driver.DeleteAttachment(ctx, delete); err != nil {
+		return err
 	}
-
-	return s.driver.DeleteAttachment(ctx, delete)
+	s.enqueueOrDeleteAttachmentStorage(ctx, []*Attachment{attachment})
+	return nil
 }
 
+// DeleteAttachments removes the attachment rows and enqueues their external
+// objects for asynchronous cleanup by the storage cleanup worker.
 func (s *Store) DeleteAttachments(ctx context.Context, attachments []*Attachment) error {
 	if len(attachments) == 0 {
 		return nil
@@ -228,7 +229,25 @@ func (s *Store) DeleteAttachments(ctx context.Context, attachments []*Attachment
 	if err := s.driver.DeleteAttachments(ctx, deletes); err != nil {
 		return err
 	}
-	return s.deleteAttachmentStorageSnapshots(ctx, attachments)
+	s.enqueueOrDeleteAttachmentStorage(ctx, attachments)
+	return nil
+}
+
+// enqueueOrDeleteAttachmentStorage records deleted snapshots in the cleanup
+// ledger. Enqueue failures fall back to deleting the objects directly so a
+// ledger write problem cannot strand objects; the fallback keeps the legacy
+// best-effort behavior for S3 errors.
+func (s *Store) enqueueOrDeleteAttachmentStorage(ctx context.Context, attachments []*Attachment) {
+	tasks := BuildStorageCleanupTasks(attachments, StorageCleanupSourceAttachment)
+	if len(tasks) == 0 {
+		return
+	}
+	if err := s.InsertStorageCleanupTasks(ctx, tasks); err != nil {
+		slog.Warn("Failed to enqueue attachment cleanup, deleting directly", slog.Any("err", err))
+		if err := s.deleteAttachmentStorageSnapshots(ctx, attachments); err != nil {
+			slog.Warn("Failed to delete attachment storage", slog.Any("err", err))
+		}
+	}
 }
 
 func (s *Store) deleteAttachmentStorageSnapshots(ctx context.Context, attachments []*Attachment) error {

@@ -488,10 +488,9 @@ func (s *APIV1Service) DeleteUser(ctx context.Context, request *v1pb.DeleteUserR
 	}
 	isSelfDelete := currentUser.ID == userID
 
-	deleteResult, err := s.Store.DeleteUser(ctx, &store.DeleteUser{
+	if _, err := s.Store.DeleteUser(ctx, &store.DeleteUser{
 		ID: user.ID,
-	})
-	if err != nil {
+	}); err != nil {
 		if stderrors.Is(err, store.ErrUserHasSpaceMembership) {
 			return nil, status.Error(codes.FailedPrecondition, "leave all spaces before deleting this account")
 		}
@@ -502,9 +501,9 @@ func (s *APIV1Service) DeleteUser(ctx context.Context, request *v1pb.DeleteUserR
 			slog.Warn("failed to clear auth cookies after self delete", "user_id", userID, "error", err)
 		}
 	}
-	if err := s.cleanupDeletedAttachmentStorage(ctx, deleteResult.Attachments); err != nil {
-		return nil, status.Errorf(codes.Internal, "user was deleted but attachment storage cleanup failed: %v", err)
-	}
+	// Attachment objects are cleaned up asynchronously by the storage cleanup
+	// worker; the delete transaction already enqueued the ledger rows.
+	s.notifyStorageCleanup()
 
 	return &emptypb.Empty{}, nil
 }

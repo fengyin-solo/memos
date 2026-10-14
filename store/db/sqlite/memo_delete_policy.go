@@ -52,7 +52,7 @@ func (d *DB) DeleteMemoWithPolicy(ctx context.Context, delete *store.DeleteMemoW
 	}
 	actorCanRead := store.MemoDeleteActorCanRead(rowStatus, visibility, spaceID, spaceExists, actorMember || actor.Admin)
 
-	attachments, err := deleteSQLiteMemoSetTx(ctx, tx, []int32{delete.MemoID})
+	attachments, err := deleteSQLiteMemoSetTx(ctx, tx, []int32{delete.MemoID}, store.StorageCleanupSourceMemo)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to delete memo set")
 	}

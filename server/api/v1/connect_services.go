@@ -64,6 +64,14 @@ func (s *ConnectServiceHandler) GetInstanceStats(ctx context.Context, req *conne
 	return connect.NewResponse(resp), nil
 }
 
+func (s *ConnectServiceHandler) ReconcileStorageCleanup(ctx context.Context, req *connect.Request[v1pb.ReconcileStorageCleanupRequest]) (*connect.Response[v1pb.ReconcileStorageCleanupResponse], error) {
+	resp, err := s.APIV1Service.ReconcileStorageCleanup(ctx, req.Msg)
+	if err != nil {
+		return nil, convertGRPCError(err)
+	}
+	return connect.NewResponse(resp), nil
+}
+
 // AuthService
 //
 // Auth service methods need special handling for response headers (cookies).

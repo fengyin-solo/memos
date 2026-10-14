@@ -29,7 +29,9 @@ func newIntegrationService(t *testing.T) *APIV1Service {
 	ctx := context.Background()
 	st := teststore.NewTestingStore(ctx, t)
 	t.Cleanup(func() { st.Close() })
-	p := &profile.Profile{Demo: true, Data: t.TempDir(), Driver: "sqlite", DSN: ":memory:"}
+	// Point the service data directory at the store's own directory so local
+	// attachment writes and cleanup worker deletes resolve the same paths.
+	p := &profile.Profile{Demo: true, Data: st.GetDataDir(), Driver: "sqlite", DSN: ":memory:"}
 	return NewAPIV1Service("test-secret", p, st)
 }
 
@@ -196,7 +198,7 @@ func TestUpdateAttachmentPublishesAfterCommittedAccessChange(t *testing.T) {
 	require.Equal(t, codes.PermissionDenied, status.Code(err), "the authorized read would fail after the committed membership change")
 }
 
-func TestDeleteAttachmentPublishesBeforeStorageCleanupFailure(t *testing.T) {
+func TestDeleteAttachmentDefersStorageCleanupToLedger(t *testing.T) {
 	ctx := context.Background()
 	svc := newIntegrationService(t)
 	owner := createSpaceTestUser(ctx, t, svc, "sse-attachment-cleanup-owner", store.RoleUser)
@@ -205,19 +207,26 @@ func TestDeleteAttachmentPublishesBeforeStorageCleanupFailure(t *testing.T) {
 		Memo: &v1pb.Memo{Content: "attachment cleanup failure", Visibility: v1pb.Visibility_PRIVATE},
 	})
 	require.NoError(t, err)
-	attachment, err := svc.CreateAttachment(ownerCtx, &v1pb.CreateAttachmentRequest{Attachment: &v1pb.Attachment{
-		Filename: "cleanup.txt",
-		Type:     "text/plain",
-		Content:  []byte("attachment"),
-		Memo:     &memo.Name,
-	}})
+	attachmentPath := filepath.Join(svc.Profile.Data, "assets", "sse-deferred-cleanup.txt")
+	require.NoError(t, os.MkdirAll(filepath.Dir(attachmentPath), 0o770))
+	require.NoError(t, os.WriteFile(attachmentPath, []byte("attachment"), 0o600))
+	memoUID, err := ExtractMemoUIDFromName(memo.Name)
 	require.NoError(t, err)
+	storedMemo, err := svc.Store.GetMemo(ctx, &store.FindMemo{UID: &memoUID})
+	require.NoError(t, err)
+	stored, err := svc.Store.CreateAttachment(ctx, &store.Attachment{
+		UID: "sse-deferred-cleanup", CreatorID: owner.ID, Filename: "cleanup.txt", Type: "text/plain",
+		StorageType: storepb.AttachmentStorageType_LOCAL, Reference: "assets/sse-deferred-cleanup.txt", MemoID: &storedMemo.ID,
+	})
+	require.NoError(t, err)
+	attachment := &v1pb.Attachment{Name: AttachmentNamePrefix + stored.UID}
 
 	client := svc.SSEHub.Subscribe()
 	defer svc.SSEHub.Unsubscribe(client)
-	_, err = svc.DeleteAttachment(store.WithDeleteAttachmentStorageFailpoint(ownerCtx), &v1pb.DeleteAttachmentRequest{Name: attachment.Name})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "attachments were deleted but storage cleanup failed")
+	// Storage deletion is deferred to the cleanup ledger, so even a failing
+	// storage backend must not fail the committed attachment deletion.
+	_, err = svc.DeleteAttachment(ownerCtx, &v1pb.DeleteAttachmentRequest{Name: attachment.Name})
+	require.NoError(t, err)
 	requireMemoChanged(t, client.events)
 	requireNoMemoChanged(t, client.events)
 
@@ -225,7 +234,20 @@ func TestDeleteAttachmentPublishesBeforeStorageCleanupFailure(t *testing.T) {
 	require.NoError(t, err)
 	storedAttachment, err := svc.Store.GetAttachment(ctx, &store.FindAttachment{UID: &attachmentUID})
 	require.NoError(t, err)
-	require.Nil(t, storedAttachment, "the database deletion must remain committed")
+	require.Nil(t, storedAttachment, "the database deletion must be committed")
+	task := requireCleanupTaskStatus(t, svc, "assets/sse-deferred-cleanup.txt", store.StorageCleanupStatusPending)
+	require.FileExists(t, attachmentPath, "the object waits for the worker")
+
+	// The worker surfaces storage failures as retryable ledger updates
+	// instead of surfacing them to the original delete request.
+	runCleanupWorkerOnceCtx(t, svc, store.WithDeleteAttachmentStorageFailpoint(ctx))
+	task = requireCleanupTaskStatus(t, svc, "assets/sse-deferred-cleanup.txt", store.StorageCleanupStatusPending)
+	require.NotEmpty(t, task.LastError)
+	require.FileExists(t, attachmentPath)
+
+	runCleanupWorkerOnce(t, svc)
+	requireCleanupTaskStatus(t, svc, "assets/sse-deferred-cleanup.txt", store.StorageCleanupStatusSucceeded)
+	require.NoFileExists(t, attachmentPath)
 }
 
 func TestSpaceMutationsPublishSpaceChanged(t *testing.T) {
@@ -654,6 +676,9 @@ func TestDeleteMemoCleansAttachmentStorage(t *testing.T) {
 	deletedAttachment, err := svc.Store.GetAttachment(ctx, &store.FindAttachment{ID: &attachment.ID})
 	require.NoError(t, err)
 	require.Nil(t, deletedAttachment)
+
+	runCleanupWorkerOnce(t, svc)
+	requireCleanupTaskStatus(t, svc, attachmentPath, store.StorageCleanupStatusSucceeded)
 	_, err = os.Stat(attachmentPath)
 	require.ErrorIs(t, err, os.ErrNotExist)
 }

@@ -105,6 +105,9 @@ func collectDeleteUserTargets(ctx context.Context, tx *sql.Tx, userID int32) (*d
 func deleteUserTargetsTx(ctx context.Context, tx *sql.Tx, userID int32, targets *deleteUserTargetSet) error {
 	memoIDs := targets.memoIDs
 
+	if err := insertPostgresStorageCleanupTasksTx(ctx, tx, store.BuildStorageCleanupTasks(targets.attachments, store.StorageCleanupSourceUser)); err != nil {
+		return errors.Wrap(err, "failed to enqueue user attachment cleanup")
+	}
 	// Delete the memo rows before their reactions: a concurrent UpsertReaction
 	// then blocks on the uncommitted parent delete instead of inserting a row
 	// behind the reaction sweep. Do not reorder these two.

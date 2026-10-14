@@ -85,6 +85,9 @@ func (d *DB) ApplyMemoMutation(ctx context.Context, mutation *store.MemoMutation
 			return errors.Wrap(store.ErrMemoMutationConflict, "attachment is no longer removable from the memo")
 		}
 	}
+	if err := insertMySQLStorageCleanupTasksTx(ctx, tx, store.BuildStorageCleanupTasks(removedAttachments, store.StorageCleanupSourceAttachment)); err != nil {
+		return errors.Wrap(err, "failed to enqueue removed attachment cleanup")
+	}
 
 	for _, binding := range mutation.Bindings {
 		var attachmentCreatorID int32

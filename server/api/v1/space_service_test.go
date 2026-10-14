@@ -298,6 +298,7 @@ func TestSpaceServiceHardDeleteLifecycle(t *testing.T) {
 
 	_, err = service.DeleteSpace(userCtx(ctx, owner.ID), &v1pb.DeleteSpaceRequest{Name: space.Name})
 	require.NoError(t, err)
+	runCleanupWorkerOnce(t, service)
 	require.NoFileExists(t, attachmentPath)
 	_, err = service.GetSpace(userCtx(ctx, owner.ID), &v1pb.GetSpaceRequest{Name: space.Name})
 	require.Equal(t, codes.NotFound, status.Code(err))

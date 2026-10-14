@@ -553,9 +553,9 @@ func (s *APIV1Service) DeleteMemo(ctx context.Context, request *v1pb.DeleteMemoR
 			slog.Warn("Failed to dispatch memo deleted webhook", slog.Any("err", err))
 		}
 	}
-	if err := s.cleanupDeletedAttachmentStorage(ctx, deleteResult.Attachments); err != nil {
-		return nil, status.Errorf(codes.Internal, "memo was deleted but attachment storage cleanup failed: %v", err)
-	}
+	// Attachment objects are cleaned up asynchronously by the storage cleanup
+	// worker; the delete transaction already enqueued the ledger rows.
+	s.notifyStorageCleanup()
 
 	return &emptypb.Empty{}, nil
 }

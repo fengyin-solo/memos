@@ -52,6 +52,9 @@ const (
 	// InstanceServiceGetInstanceStatsProcedure is the fully-qualified name of the InstanceService's
 	// GetInstanceStats RPC.
 	InstanceServiceGetInstanceStatsProcedure = "/memos.api.v1.InstanceService/GetInstanceStats"
+	// InstanceServiceReconcileStorageCleanupProcedure is the fully-qualified name of the
+	// InstanceService's ReconcileStorageCleanup RPC.
+	InstanceServiceReconcileStorageCleanupProcedure = "/memos.api.v1.InstanceService/ReconcileStorageCleanup"
 )
 
 // InstanceServiceClient is a client for the memos.api.v1.InstanceService service.
@@ -68,6 +71,9 @@ type InstanceServiceClient interface {
 	TestInstanceEmailSetting(context.Context, *connect.Request[v1.TestInstanceEmailSettingRequest]) (*connect.Response[emptypb.Empty], error)
 	// GetInstanceStats returns resource usage statistics for the instance. Admin only.
 	GetInstanceStats(context.Context, *connect.Request[v1.GetInstanceStatsRequest]) (*connect.Response[v1.InstanceStats], error)
+	// ReconcileStorageCleanup runs a read-only scan of the external object
+	// cleanup ledger against actual storage state. Admin only.
+	ReconcileStorageCleanup(context.Context, *connect.Request[v1.ReconcileStorageCleanupRequest]) (*connect.Response[v1.ReconcileStorageCleanupResponse], error)
 }
 
 // NewInstanceServiceClient constructs a client for the memos.api.v1.InstanceService service. By
@@ -117,6 +123,12 @@ func NewInstanceServiceClient(httpClient connect.HTTPClient, baseURL string, opt
 			connect.WithSchema(instanceServiceMethods.ByName("GetInstanceStats")),
 			connect.WithClientOptions(opts...),
 		),
+		reconcileStorageCleanup: connect.NewClient[v1.ReconcileStorageCleanupRequest, v1.ReconcileStorageCleanupResponse](
+			httpClient,
+			baseURL+InstanceServiceReconcileStorageCleanupProcedure,
+			connect.WithSchema(instanceServiceMethods.ByName("ReconcileStorageCleanup")),
+			connect.WithClientOptions(opts...),
+		),
 	}
 }
 
@@ -128,6 +140,7 @@ type instanceServiceClient struct {
 	updateInstanceSetting    *connect.Client[v1.UpdateInstanceSettingRequest, v1.InstanceSetting]
 	testInstanceEmailSetting *connect.Client[v1.TestInstanceEmailSettingRequest, emptypb.Empty]
 	getInstanceStats         *connect.Client[v1.GetInstanceStatsRequest, v1.InstanceStats]
+	reconcileStorageCleanup  *connect.Client[v1.ReconcileStorageCleanupRequest, v1.ReconcileStorageCleanupResponse]
 }
 
 // GetInstanceProfile calls memos.api.v1.InstanceService.GetInstanceProfile.
@@ -160,6 +173,11 @@ func (c *instanceServiceClient) GetInstanceStats(ctx context.Context, req *conne
 	return c.getInstanceStats.CallUnary(ctx, req)
 }
 
+// ReconcileStorageCleanup calls memos.api.v1.InstanceService.ReconcileStorageCleanup.
+func (c *instanceServiceClient) ReconcileStorageCleanup(ctx context.Context, req *connect.Request[v1.ReconcileStorageCleanupRequest]) (*connect.Response[v1.ReconcileStorageCleanupResponse], error) {
+	return c.reconcileStorageCleanup.CallUnary(ctx, req)
+}
+
 // InstanceServiceHandler is an implementation of the memos.api.v1.InstanceService service.
 type InstanceServiceHandler interface {
 	// Gets the instance profile.
@@ -174,6 +192,9 @@ type InstanceServiceHandler interface {
 	TestInstanceEmailSetting(context.Context, *connect.Request[v1.TestInstanceEmailSettingRequest]) (*connect.Response[emptypb.Empty], error)
 	// GetInstanceStats returns resource usage statistics for the instance. Admin only.
 	GetInstanceStats(context.Context, *connect.Request[v1.GetInstanceStatsRequest]) (*connect.Response[v1.InstanceStats], error)
+	// ReconcileStorageCleanup runs a read-only scan of the external object
+	// cleanup ledger against actual storage state. Admin only.
+	ReconcileStorageCleanup(context.Context, *connect.Request[v1.ReconcileStorageCleanupRequest]) (*connect.Response[v1.ReconcileStorageCleanupResponse], error)
 }
 
 // NewInstanceServiceHandler builds an HTTP handler from the service implementation. It returns the
@@ -219,6 +240,12 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 		connect.WithSchema(instanceServiceMethods.ByName("GetInstanceStats")),
 		connect.WithHandlerOptions(opts...),
 	)
+	instanceServiceReconcileStorageCleanupHandler := connect.NewUnaryHandler(
+		InstanceServiceReconcileStorageCleanupProcedure,
+		svc.ReconcileStorageCleanup,
+		connect.WithSchema(instanceServiceMethods.ByName("ReconcileStorageCleanup")),
+		connect.WithHandlerOptions(opts...),
+	)
 	return "/memos.api.v1.InstanceService/", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case InstanceServiceGetInstanceProfileProcedure:
@@ -233,6 +260,8 @@ func NewInstanceServiceHandler(svc InstanceServiceHandler, opts ...connect.Handl
 			instanceServiceTestInstanceEmailSettingHandler.ServeHTTP(w, r)
 		case InstanceServiceGetInstanceStatsProcedure:
 			instanceServiceGetInstanceStatsHandler.ServeHTTP(w, r)
+		case InstanceServiceReconcileStorageCleanupProcedure:
+			instanceServiceReconcileStorageCleanupHandler.ServeHTTP(w, r)
 		default:
 			http.NotFound(w, r)
 		}
@@ -264,4 +293,8 @@ func (UnimplementedInstanceServiceHandler) TestInstanceEmailSetting(context.Cont
 
 func (UnimplementedInstanceServiceHandler) GetInstanceStats(context.Context, *connect.Request[v1.GetInstanceStatsRequest]) (*connect.Response[v1.InstanceStats], error) {
 	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.GetInstanceStats is not implemented"))
+}
+
+func (UnimplementedInstanceServiceHandler) ReconcileStorageCleanup(context.Context, *connect.Request[v1.ReconcileStorageCleanupRequest]) (*connect.Response[v1.ReconcileStorageCleanupResponse], error) {
+	return nil, connect.NewError(connect.CodeUnimplemented, errors.New("memos.api.v1.InstanceService.ReconcileStorageCleanup is not implemented"))
 }

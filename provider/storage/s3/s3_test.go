@@ -66,6 +66,31 @@ func TestDriverObjectLifecycle(t *testing.T) {
 	assertObjectLifecycle(ctx, t, driver, "assets/notes/test.txt", []byte("attachment stored in fake S3"))
 }
 
+// TestListObjectKeysPaginates enumerates more keys than one listing page
+// (S3 returns at most 1000 keys per response) and expects every key back.
+func TestListObjectKeysPaginates(t *testing.T) {
+	ctx := context.Background()
+	fake := fakes3.New(t, "many-objects")
+	const total = 1005
+	for i := range total {
+		key := fmt.Sprintf("assets/%04d.txt", i)
+		require.NoError(t, fake.PutObject("many-objects", key, "text/plain", []byte(key)))
+	}
+	driver, err := NewDriver(ctx, fake.Config("many-objects"))
+	require.NoError(t, err)
+
+	keys, err := driver.ListObjectKeys(ctx)
+	require.NoError(t, err)
+	require.Len(t, keys, total)
+	seen := make(map[string]struct{}, total)
+	for _, key := range keys {
+		seen[key] = struct{}{}
+	}
+	require.Len(t, seen, total)
+	require.Contains(t, seen, fmt.Sprintf("assets/%04d.txt", 0))
+	require.Contains(t, seen, fmt.Sprintf("assets/%04d.txt", total-1))
+}
+
 func TestNewDriverInsecureSkipTLSVerify(t *testing.T) {
 	server := httptest.NewTLSServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		require.Equal(t, http.MethodGet, r.Method)

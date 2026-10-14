@@ -220,34 +220,6 @@ func hasSameManagedStorageObject(left, right *store.Attachment) bool {
 	}
 }
 
-func (s *APIV1Service) cleanupDeletedAttachmentStorage(ctx context.Context, attachments []*store.Attachment) error {
-	var instanceStorageSetting *storepb.InstanceStorageSetting
-	var instanceStorageSettingErr error
-	for _, attachment := range attachments {
-		if store.AttachmentNeedsInstanceStorageSetting(attachment) {
-			instanceStorageSetting, instanceStorageSettingErr = s.Store.GetInstanceStorageSetting(ctx)
-			break
-		}
-	}
-
-	var firstErr error
-	for _, attachment := range attachments {
-		if attachment == nil {
-			continue
-		}
-		var err error
-		if instanceStorageSettingErr != nil && store.AttachmentNeedsInstanceStorageSetting(attachment) {
-			err = errors.Wrap(instanceStorageSettingErr, "failed to get instance storage setting")
-		} else {
-			err = s.Store.DeleteAttachmentStorageWithInstanceSetting(ctx, attachment, instanceStorageSetting)
-		}
-		if err != nil && firstErr == nil {
-			firstErr = errors.Wrapf(err, "attachment %d", attachment.ID)
-		}
-	}
-	return firstErr
-}
-
 // GetAttachmentBlob reads an attachment from its configured storage.
 func (s *APIV1Service) GetAttachmentBlob(ctx context.Context, attachment *store.Attachment) ([]byte, error) {
 	content, err := s.openAttachmentContent(ctx, attachment)

@@ -304,6 +304,9 @@ func TestDeleteUserSelfDeleteRemovesOnlyOwnedMemosAndResources(t *testing.T) {
 	peerAttachmentAfterDelete, err := ts.Store.GetAttachment(ctx, &store.FindAttachment{ID: &peerAttachment.ID})
 	require.NoError(t, err)
 	require.NotNil(t, peerAttachmentAfterDelete)
+
+	// Derived caches are removed by the cleanup worker from cache-only tasks.
+	ts.RunStorageCleanupWorker(t)
 	_, err = os.Stat(thumbnailCachePath)
 	require.ErrorIs(t, err, os.ErrNotExist)
 	_, err = os.Stat(motionCachePath)
@@ -521,7 +524,7 @@ func TestDeleteUserRollbackPreservesAllResources(t *testing.T) {
 	require.NotNil(t, patSetting)
 }
 
-func TestDeleteUserReportsPostCommitAttachmentStorageCleanupFailure(t *testing.T) {
+func TestDeleteUserDefersAttachmentStorageCleanupToLedger(t *testing.T) {
 	t.Parallel()
 
 	ts := NewTestService(t)
@@ -545,17 +548,27 @@ func TestDeleteUserReportsPostCommitAttachmentStorageCleanupFailure(t *testing.T
 	attachmentPath := filepath.Join(ts.Profile.Data, "cleanup-failure.txt")
 	require.NoError(t, os.WriteFile(attachmentPath, []byte("failure"), 0o600))
 
+	// Storage deletion is deferred to the ledger, so it cannot fail the
+	// committed user deletion.
 	headerCtx := apiv1.WithHeaderCarrier(ctx)
-	authCtx := ts.CreateUserContext(store.WithDeleteAttachmentStorageFailpoint(headerCtx), user.ID)
+	authCtx := ts.CreateUserContext(headerCtx, user.ID)
 	_, err = ts.Service.DeleteUser(authCtx, &v1pb.DeleteUserRequest{
 		Name: apiv1.BuildUserName(user.Username),
 	})
-	require.Equal(t, codes.Internal, status.Code(err))
-	require.ErrorContains(t, err, "user was deleted but attachment storage cleanup failed")
-	require.ErrorContains(t, err, store.ErrDeleteAttachmentStorageFailpoint.Error())
+	require.NoError(t, err)
 
 	deletedUser, err := ts.Store.GetUser(ctx, &store.FindUser{ID: &user.ID})
 	require.NoError(t, err)
 	require.Nil(t, deletedUser)
-	require.FileExists(t, attachmentPath, "storage cleanup failure happens after the database deletion commits")
+	require.FileExists(t, attachmentPath, "objects survive until the cleanup worker runs")
+	requireStorageCleanupTask(t, ts, "cleanup-failure.txt", store.StorageCleanupStatusPending)
+
+	ts.RunStorageCleanupWorkerCtx(t, store.WithDeleteAttachmentStorageFailpoint(ctx))
+	require.FileExists(t, attachmentPath)
+	task := requireStorageCleanupTask(t, ts, "cleanup-failure.txt", store.StorageCleanupStatusPending)
+	require.NotEmpty(t, task.LastError)
+
+	ts.RunStorageCleanupWorker(t)
+	requireStorageCleanupTask(t, ts, "cleanup-failure.txt", store.StorageCleanupStatusSucceeded)
+	require.NoFileExists(t, attachmentPath)
 }

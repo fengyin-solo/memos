@@ -4,12 +4,17 @@ import (
 	"context"
 	"strings"
 	"testing"
+	"time"
 
+	"github.com/stretchr/testify/require"
+
+	corecleanup "github.com/usememos/memos/core/objectcleanup"
 	"github.com/usememos/memos/internal/profile"
 	"github.com/usememos/memos/markdown"
 	storepb "github.com/usememos/memos/proto/gen/store"
 	apiv1 "github.com/usememos/memos/server/api/v1"
 	"github.com/usememos/memos/server/auth"
+	servercleanup "github.com/usememos/memos/server/objectcleanup"
 	"github.com/usememos/memos/store"
 	teststore "github.com/usememos/memos/store/test"
 )
@@ -130,4 +135,23 @@ func (ts *TestService) InviteAndAcceptSpaceMember(ctx context.Context, create *s
 func (*TestService) CreateUserContext(ctx context.Context, userID int32) context.Context {
 	// Use the context key from the auth package
 	return context.WithValue(ctx, auth.UserIDContextKey, userID)
+}
+
+// RunStorageCleanupWorker drives one storage cleanup worker pass so tests can
+// observe the asynchronous object deletion.
+func (ts *TestService) RunStorageCleanupWorker(t *testing.T) {
+	t.Helper()
+	ts.RunStorageCleanupWorkerCtx(t, context.Background())
+}
+
+// RunStorageCleanupWorkerCtx drives a pass with a custom context (e.g. a
+// storage deletion failpoint).
+func (ts *TestService) RunStorageCleanupWorkerCtx(t *testing.T, ctx context.Context) {
+	t.Helper()
+	worker := servercleanup.New(ts.Store, ts.Profile,
+		servercleanup.WithWorkerID("test-worker"),
+		servercleanup.WithLease(time.Hour),
+		servercleanup.WithBackoff(corecleanup.BackoffConfig{Base: 0, Factor: 2, Cap: time.Hour}),
+	)
+	require.NoError(t, worker.RunOnce(ctx))
 }

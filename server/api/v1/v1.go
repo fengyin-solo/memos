@@ -85,6 +85,11 @@ type APIV1Service struct {
 	thumbnailSemaphore       *semaphore.Weighted
 	imageProcessingSemaphore *semaphore.Weighted
 
+	// StorageCleanupNotifier nudges the background storage cleanup worker
+	// after a committed deletion so objects are removed without waiting for
+	// the next polling tick. Nil in tests that drive the worker directly.
+	StorageCleanupNotifier func()
+
 	// instanceStatsCache memoizes GetInstanceStats results for instanceStatsCacheTTL.
 	instanceStatsCache instanceStatsCache
 

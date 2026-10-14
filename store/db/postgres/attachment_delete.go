@@ -37,6 +37,9 @@ func (d *DB) DeleteAttachmentsWithPolicy(ctx context.Context, policy *store.Atta
 	if err := authorizePostgresAttachmentMutation(ctx, tx, policy.ActorUserID, actor.Admin, memoIDs, policy.ExpectedMemoContents); err != nil {
 		return err
 	}
+	if err := insertPostgresStorageCleanupTasksTx(ctx, tx, store.BuildStorageCleanupTasks(attachments, store.StorageCleanupSourceAttachment)); err != nil {
+		return errors.Wrap(err, "failed to enqueue attachment cleanup")
+	}
 
 	for _, attachmentID := range attachmentIDs {
 		result, err := tx.ExecContext(ctx, "DELETE FROM attachment WHERE id = $1", attachmentID)

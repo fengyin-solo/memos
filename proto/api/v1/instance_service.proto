@@ -55,6 +55,29 @@ service InstanceService {
   rpc GetInstanceStats(GetInstanceStatsRequest) returns (InstanceStats) {
     option (google.api.http) = {get: "/api/v1/instance/stats"};
   }
+
+  // ReconcileStorageCleanup runs a read-only scan of the external object
+  // cleanup ledger against actual storage state. Admin only.
+  rpc ReconcileStorageCleanup(ReconcileStorageCleanupRequest) returns (ReconcileStorageCleanupResponse) {
+    option (google.api.http) = {
+      post: "/api/v1/instance/storage-cleanup:reconcile"
+      body: "*"
+    };
+  }
+}
+
+// StorageCleanupSource identifies the business deletion that enqueued a
+// storage cleanup task.
+enum StorageCleanupSource {
+  STORAGE_CLEANUP_SOURCE_UNSPECIFIED = 0;
+  // A direct attachment deletion or an attachment removed while editing a memo.
+  STORAGE_CLEANUP_SOURCE_ATTACHMENT = 1;
+  // A memo deletion.
+  STORAGE_CLEANUP_SOURCE_MEMO = 2;
+  // A Space deletion.
+  STORAGE_CLEANUP_SOURCE_SPACE = 3;
+  // A user deletion that cascaded to the user's memos and attachments.
+  STORAGE_CLEANUP_SOURCE_USER = 4;
 }
 
 // InstanceAccessMode controls whether unauthenticated users may access instance content.
@@ -427,5 +450,45 @@ message InstanceStats {
     string driver = 1;
     // size_bytes is the database size in bytes; -1 if unavailable.
     int64 size_bytes = 2;
+  }
+}
+
+// Request message for ReconcileStorageCleanup.
+message ReconcileStorageCleanupRequest {}
+
+// Read-only report of the external object cleanup ledger against storage state.
+message ReconcileStorageCleanupResponse {
+  // Task counts grouped by the source of the business deletion.
+  repeated SourceCount source_counts = 1;
+  // Suspected orphan object counts grouped by physical storage.
+  repeated StorageOrphanCount orphan_counts = 2;
+  // Server-side timestamp when the scan was generated.
+  google.protobuf.Timestamp generated_time = 3;
+
+  // Task counts for one deletion source.
+  message SourceCount {
+    StorageCleanupSource source = 1;
+    // Tasks waiting to be claimed (including retry backoff).
+    int64 pending_count = 2;
+    // Tasks currently claimed by a worker.
+    int64 processing_count = 3;
+    // Tasks whose objects were deleted successfully.
+    int64 succeeded_count = 4;
+    // Tasks that failed with an unrecoverable error.
+    int64 failed_count = 5;
+  }
+
+  // Count of objects present in storage but absent from both the attachment
+  // table and the cleanup ledger, for one physical storage namespace.
+  message StorageOrphanCount {
+    // LOCAL or S3. Reuses the instance storage type enumeration.
+    InstanceSetting.StorageType storage_type = 1;
+    // "local" for local filesystem objects, otherwise the named S3 storage id.
+    string storage_id = 2;
+    // Objects that exist but have neither a live attachment nor a ledger row.
+    int64 suspected_orphan_count = 3;
+    // False when the storage could not be listed (e.g. removed registry entry);
+    // suspected_orphan_count is zero in that case.
+    bool available = 4;
   }
 }

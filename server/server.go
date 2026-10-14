@@ -21,6 +21,7 @@ import (
 	"github.com/usememos/memos/server/fileserver"
 	"github.com/usememos/memos/server/frontend"
 	"github.com/usememos/memos/server/mcp"
+	"github.com/usememos/memos/server/objectcleanup"
 	"github.com/usememos/memos/store"
 )
 
@@ -41,9 +42,10 @@ type Server struct {
 	Profile *profile.Profile
 	Store   *store.Store
 
-	echoServer   *echo.Echo
-	httpServer   *http.Server
-	apiV1Service *apiv1.APIV1Service
+	echoServer    *echo.Echo
+	httpServer    *http.Server
+	apiV1Service  *apiv1.APIV1Service
+	cleanupWorker *objectcleanup.Worker
 }
 
 func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store) (*Server, error) {
@@ -102,6 +104,13 @@ func NewServer(ctx context.Context, profile *profile.Profile, store *store.Store
 	}
 	mcpService.RegisterRoutes(echoServer)
 
+	// The cleanup worker retries external object deletions recorded by the
+	// storage cleanup ledger. It resumes pending and lease-expired tasks left
+	// by previous incarnations.
+	s.cleanupWorker = objectcleanup.New(store, profile)
+	apiV1Service.StorageCleanupNotifier = s.cleanupWorker.Notify
+	s.cleanupWorker.Start(ctx)
+
 	return s, nil
 }
 
@@ -150,6 +159,17 @@ func (s *Server) Shutdown(ctx context.Context) {
 	s.closeLongLivedConnections()
 	s.shutdownHTTPServer(ctx)
 	s.apiV1Service.CloseUploads()
+
+	// Stop the cleanup worker before closing the database so an in-flight
+	// result write-back does not hit a closed connection. Interrupted tasks
+	// keep their lease and are reclaimed after expiry on the next start.
+	if s.cleanupWorker != nil {
+		shutdownCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 35*time.Second)
+		if err := s.cleanupWorker.Shutdown(shutdownCtx); err != nil {
+			slog.Error("storage cleanup worker did not stop cleanly", slog.String("error", err.Error()))
+		}
+		cancel()
+	}
 
 	// Close database connection.
 	if err := s.Store.Close(); err != nil {

@@ -577,6 +577,33 @@ paths:
                         application/json:
                             schema:
                                 $ref: '#/components/schemas/Status'
+    /api/v1/instance/storage-cleanup:reconcile:
+        post:
+            tags:
+                - InstanceService
+            description: |-
+                ReconcileStorageCleanup runs a read-only scan of the external object
+                 cleanup ledger against actual storage state. Admin only.
+            operationId: InstanceService_ReconcileStorageCleanup
+            requestBody:
+                content:
+                    application/json:
+                        schema:
+                            $ref: '#/components/schemas/ReconcileStorageCleanupRequest'
+                required: true
+            responses:
+                "200":
+                    description: OK
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/ReconcileStorageCleanupResponse'
+                default:
+                    description: Default error response
+                    content:
+                        application/json:
+                            schema:
+                                $ref: '#/components/schemas/Status'
     /api/v1/instance/{instance}/*:
         get:
             tags:
@@ -4538,6 +4565,79 @@ components:
                     description: Output only. The creation timestamp.
                     format: date-time
             description: Reaction is a reaction attached to a memo.
+        ReconcileStorageCleanupRequest:
+            type: object
+            properties: {}
+            description: Request message for ReconcileStorageCleanup.
+        ReconcileStorageCleanupResponse:
+            type: object
+            properties:
+                sourceCounts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ReconcileStorageCleanupResponse_SourceCount'
+                    description: Task counts grouped by the source of the business deletion.
+                orphanCounts:
+                    type: array
+                    items:
+                        $ref: '#/components/schemas/ReconcileStorageCleanupResponse_StorageOrphanCount'
+                    description: Suspected orphan object counts grouped by physical storage.
+                generatedTime:
+                    type: string
+                    description: Server-side timestamp when the scan was generated.
+                    format: date-time
+            description: Read-only report of the external object cleanup ledger against storage state.
+        ReconcileStorageCleanupResponse_SourceCount:
+            type: object
+            properties:
+                source:
+                    enum:
+                        - STORAGE_CLEANUP_SOURCE_UNSPECIFIED
+                        - STORAGE_CLEANUP_SOURCE_ATTACHMENT
+                        - STORAGE_CLEANUP_SOURCE_MEMO
+                        - STORAGE_CLEANUP_SOURCE_SPACE
+                        - STORAGE_CLEANUP_SOURCE_USER
+                    type: string
+                    format: enum
+                pendingCount:
+                    type: string
+                    description: Tasks waiting to be claimed (including retry backoff).
+                processingCount:
+                    type: string
+                    description: Tasks currently claimed by a worker.
+                succeededCount:
+                    type: string
+                    description: Tasks whose objects were deleted successfully.
+                failedCount:
+                    type: string
+                    description: Tasks that failed with an unrecoverable error.
+            description: Task counts for one deletion source.
+        ReconcileStorageCleanupResponse_StorageOrphanCount:
+            type: object
+            properties:
+                storageType:
+                    enum:
+                        - STORAGE_TYPE_UNSPECIFIED
+                        - DATABASE
+                        - LOCAL
+                        - S3
+                    type: string
+                    description: LOCAL or S3. Reuses the instance storage type enumeration.
+                    format: enum
+                storageId:
+                    type: string
+                    description: '"local" for local filesystem objects, otherwise the named S3 storage id.'
+                suspectedOrphanCount:
+                    type: string
+                    description: Objects that exist but have neither a live attachment nor a ledger row.
+                available:
+                    type: boolean
+                    description: |-
+                        False when the storage could not be listed (e.g. removed registry entry);
+                         suspected_orphan_count is zero in that case.
+            description: |-
+                Count of objects present in storage but absent from both the attachment
+                 table and the cleanup ledger, for one physical storage namespace.
         RefreshTokenRequest:
             type: object
             properties: {}

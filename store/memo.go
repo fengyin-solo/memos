@@ -400,9 +400,6 @@ func (s *Store) DeleteMemo(ctx context.Context, delete *DeleteMemo) error {
 	if memo == nil {
 		return nil
 	}
-	result, err := s.DeleteMemoWithPolicy(ctx, &DeleteMemoWithPolicy{MemoID: memo.ID, ActorUserID: memo.CreatorID})
-	if err != nil {
-		return err
-	}
-	return s.deleteAttachmentStorageSnapshots(ctx, result.Attachments)
+	_, err = s.DeleteMemoWithPolicy(ctx, &DeleteMemoWithPolicy{MemoID: memo.ID, ActorUserID: memo.CreatorID})
+	return err
 }

@@ -133,6 +133,10 @@ func runS3AttachmentLifecycleAcrossStorageChange(t *testing.T, objectStore *fake
 
 	_, err = ts.Service.DeleteAttachment(userCtx, &v1pb.DeleteAttachmentRequest{Name: first.Name})
 	require.NoError(t, err)
+	// Object deletion is asynchronous via the cleanup ledger.
+	_, err = objectStore.GetObject("attachments-old", oldKey)
+	require.NoError(t, err, "the object stays until the cleanup worker runs")
+	ts.RunStorageCleanupWorker(t)
 	_, err = objectStore.GetObject("attachments-old", oldKey)
 	require.Error(t, err, "deleting an attachment must delete its S3 object")
 	remaining, err := objectStore.GetObject("attachments-new", newKey)
@@ -226,6 +230,7 @@ func TestGetLegacyS3AttachmentBlob(t *testing.T) {
 
 		_, err = ts.Service.DeleteAttachment(userCtx, &v1pb.DeleteAttachmentRequest{Name: apiv1.AttachmentNamePrefix + legacyAttachment.UID})
 		require.NoError(t, err)
+		ts.RunStorageCleanupWorker(t)
 		_, err = fake.GetObject(currentConfig.Bucket, key)
 		require.Error(t, err, "deleting a legacy attachment must use the current matching storage configuration")
 	})

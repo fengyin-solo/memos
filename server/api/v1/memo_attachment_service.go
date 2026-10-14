@@ -249,9 +249,9 @@ func (s *APIV1Service) applyMemoMutation(
 	if err := s.Store.ApplyMemoMutation(ctx, mutation); err != nil {
 		return mapMemoWriteError(err, "failed to apply memo mutation")
 	}
-	if err := s.cleanupDeletedAttachmentStorage(ctx, prepared.removed); err != nil {
-		return status.Errorf(codes.Internal, "memo was updated but attachment storage cleanup failed: %v", err)
-	}
+	// Removed attachment objects are cleaned up asynchronously by the storage
+	// cleanup worker; ApplyMemoMutation already enqueued the ledger rows.
+	s.notifyStorageCleanup()
 	return nil
 }
 

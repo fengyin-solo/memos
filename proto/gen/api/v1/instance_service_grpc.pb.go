@@ -26,6 +26,7 @@ const (
 	InstanceService_UpdateInstanceSetting_FullMethodName    = "/memos.api.v1.InstanceService/UpdateInstanceSetting"
 	InstanceService_TestInstanceEmailSetting_FullMethodName = "/memos.api.v1.InstanceService/TestInstanceEmailSetting"
 	InstanceService_GetInstanceStats_FullMethodName         = "/memos.api.v1.InstanceService/GetInstanceStats"
+	InstanceService_ReconcileStorageCleanup_FullMethodName  = "/memos.api.v1.InstanceService/ReconcileStorageCleanup"
 )
 
 // InstanceServiceClient is the client API for InstanceService service.
@@ -44,6 +45,9 @@ type InstanceServiceClient interface {
 	TestInstanceEmailSetting(ctx context.Context, in *TestInstanceEmailSettingRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	// GetInstanceStats returns resource usage statistics for the instance. Admin only.
 	GetInstanceStats(ctx context.Context, in *GetInstanceStatsRequest, opts ...grpc.CallOption) (*InstanceStats, error)
+	// ReconcileStorageCleanup runs a read-only scan of the external object
+	// cleanup ledger against actual storage state. Admin only.
+	ReconcileStorageCleanup(ctx context.Context, in *ReconcileStorageCleanupRequest, opts ...grpc.CallOption) (*ReconcileStorageCleanupResponse, error)
 }
 
 type instanceServiceClient struct {
@@ -114,6 +118,16 @@ func (c *instanceServiceClient) GetInstanceStats(ctx context.Context, in *GetIns
 	return out, nil
 }
 
+func (c *instanceServiceClient) ReconcileStorageCleanup(ctx context.Context, in *ReconcileStorageCleanupRequest, opts ...grpc.CallOption) (*ReconcileStorageCleanupResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ReconcileStorageCleanupResponse)
+	err := c.cc.Invoke(ctx, InstanceService_ReconcileStorageCleanup_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // InstanceServiceServer is the server API for InstanceService service.
 // All implementations must embed UnimplementedInstanceServiceServer
 // for forward compatibility.
@@ -130,6 +144,9 @@ type InstanceServiceServer interface {
 	TestInstanceEmailSetting(context.Context, *TestInstanceEmailSettingRequest) (*emptypb.Empty, error)
 	// GetInstanceStats returns resource usage statistics for the instance. Admin only.
 	GetInstanceStats(context.Context, *GetInstanceStatsRequest) (*InstanceStats, error)
+	// ReconcileStorageCleanup runs a read-only scan of the external object
+	// cleanup ledger against actual storage state. Admin only.
+	ReconcileStorageCleanup(context.Context, *ReconcileStorageCleanupRequest) (*ReconcileStorageCleanupResponse, error)
 	mustEmbedUnimplementedInstanceServiceServer()
 }
 
@@ -157,6 +174,9 @@ func (UnimplementedInstanceServiceServer) TestInstanceEmailSetting(context.Conte
 }
 func (UnimplementedInstanceServiceServer) GetInstanceStats(context.Context, *GetInstanceStatsRequest) (*InstanceStats, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetInstanceStats not implemented")
+}
+func (UnimplementedInstanceServiceServer) ReconcileStorageCleanup(context.Context, *ReconcileStorageCleanupRequest) (*ReconcileStorageCleanupResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ReconcileStorageCleanup not implemented")
 }
 func (UnimplementedInstanceServiceServer) mustEmbedUnimplementedInstanceServiceServer() {}
 func (UnimplementedInstanceServiceServer) testEmbeddedByValue()                         {}
@@ -287,6 +307,24 @@ func _InstanceService_GetInstanceStats_Handler(srv interface{}, ctx context.Cont
 	return interceptor(ctx, in, info, handler)
 }
 
+func _InstanceService_ReconcileStorageCleanup_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReconcileStorageCleanupRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(InstanceServiceServer).ReconcileStorageCleanup(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: InstanceService_ReconcileStorageCleanup_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(InstanceServiceServer).ReconcileStorageCleanup(ctx, req.(*ReconcileStorageCleanupRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // InstanceService_ServiceDesc is the grpc.ServiceDesc for InstanceService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -317,6 +355,10 @@ var InstanceService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "GetInstanceStats",
 			Handler:    _InstanceService_GetInstanceStats_Handler,
+		},
+		{
+			MethodName: "ReconcileStorageCleanup",
+			Handler:    _InstanceService_ReconcileStorageCleanup_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

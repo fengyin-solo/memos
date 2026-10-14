@@ -225,3 +225,25 @@ func (c *Driver) DeleteObject(ctx context.Context, key string) error {
 	}
 	return nil
 }
+
+// ListObjectKeys enumerates every object key in the bucket, following
+// pagination until the bucket is fully listed.
+func (c *Driver) ListObjectKeys(ctx context.Context) ([]string, error) {
+	keys := make([]string, 0)
+	input := &s3.ListObjectsV2Input{Bucket: c.Bucket}
+	for {
+		output, err := c.Client.ListObjectsV2(ctx, input)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to list objects")
+		}
+		for _, object := range output.Contents {
+			if object.Key != nil {
+				keys = append(keys, aws.ToString(object.Key))
+			}
+		}
+		if output.NextContinuationToken == nil || !aws.ToBool(output.IsTruncated) {
+			return keys, nil
+		}
+		input.ContinuationToken = output.NextContinuationToken
+	}
+}
